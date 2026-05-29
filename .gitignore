@@ -1,1 +1,7 @@
 .env
+Makefile
+IMPLEMENTATION_SUMMARY.md
+Readme.md
+PROGRESS.md
+COMPLETION_STATUS.md
+go-code.md
