@@ -64,26 +64,120 @@ func main() {
 	auctionRepo := postgres.NewAuctionRepository(db)
 	withdrawalRepo := postgres.NewWithdrawalRepository(db)
 
+	/*
+	@construction AuthService
+	@desc Initialize authentication service with JWT manager for SIWE token validation.
+	*/
 	authService := auth.NewAuthService(authRepo, jwtMgr)
+
+	/*
+	@construction MarketService
+	@desc Initialize market service with market and offer repositories for market operations.
+	*/
 	marketService := market.NewMarketService(marketRepo, postgres.NewMarketOfferRepository(offerRepo), postgres.NewMarketPositionRepository(positionRepo))
+
+	/*
+	@construction OfferService
+	@desc Initialize offer service for lending offer management.
+	*/
 	offerService := offer.NewOfferService(offerRepo)
+
+	/*
+	@construction PositionService
+	@desc Initialize position service for lender position tracking.
+	*/
 	positionService := position.NewPositionService(positionRepo)
+
+	/*
+	@construction BorrowerService
+	@desc Initialize borrower service for borrower risk assessment and reputation.
+	*/
 	borrowerService := borrower.NewBorrowerService(borrowerRepo)
+
+	/*
+	@construction LiquidationService
+	@desc Initialize liquidation service for auction management and Dutch auctions.
+	*/
 	liquidationService := liquidation.NewLiquidationService(auctionRepo, marketRepo, borrowerRepo)
+
+	/*
+	@construction WithdrawalService
+	@desc Initialize withdrawal service for epoch-based withdrawal processing.
+	*/
 	withdrawalService := withdrawal.NewWithdrawalService(withdrawalRepo, positionRepo)
+
+	/*
+	@construction TransactionService
+	@desc Initialize transaction service for building and estimating protocol transactions.
+	*/
 	transactionService := transaction.NewTransactionService()
 
+	/*
+	@construction HTTPHandlers
+	@desc Initialize all HTTP request handlers with service dependencies.
+	Includes auth, market, admin, offer, position, borrower, liquidation, withdrawal, and transaction handlers.
+	*/
 	router := gin.New()
 	routes.Register(router, cfg, authService, routes.Handlers{
-		Auth:        apihandlers.NewAuthHandler(authService),
-		Market:      apihandlers.NewMarketHandler(marketService),
-		Offer:       apihandlers.NewOfferHandler(offerService),
-		Position:    apihandlers.NewPositionHandler(positionService),
-		Borrower:    apihandlers.NewBorrowerHandler(borrowerService),
+		/*
+		@handler Auth
+		@desc Handles SIWE authentication, nonce generation, login, and logout operations.
+		*/
+		Auth: apihandlers.NewAuthHandler(authService),
+
+		/*
+		@handler Admin
+		@desc Handles administrative market operations including creation, status updates, and metrics.
+		*/
+		Admin: apihandlers.NewAdminHandler(marketService, market.NewValidator()),
+
+		/*
+		@handler Market
+		@desc Handles public market queries, creation, and metric retrieval.
+		*/
+		Market: apihandlers.NewMarketHandler(marketService),
+
+		/*
+		@handler Offer
+		@desc Handles lending offer creation, cancellation, and quote calculations.
+		*/
+		Offer: apihandlers.NewOfferHandler(offerService),
+
+		/*
+		@handler Position
+		@desc Handles lender position queries, portfolio summaries, and position claims.
+		*/
+		Position: apihandlers.NewPositionHandler(positionService),
+
+		/*
+		@handler Borrower
+		@desc Handles borrower profile lookup, risk assessment, and registration.
+		*/
+		Borrower: apihandlers.NewBorrowerHandler(borrowerService),
+
+		/*
+		@handler Liquidation
+		@desc Handles liquidation auction queries, bidding, and auction status checks.
+		*/
 		Liquidation: apihandlers.NewLiquidationHandler(liquidationService),
-		Withdrawal:  apihandlers.NewWithdrawalHandler(withdrawalService),
+
+		/*
+		@handler Withdrawal
+		@desc Handles withdrawal requests, cancellations, and epoch processing.
+		*/
+		Withdrawal: apihandlers.NewWithdrawalHandler(withdrawalService),
+
+		/*
+		@handler Transaction
+		@desc Handles building protocol transactions and estimating gas/fees.
+		*/
 		Transaction: apihandlers.NewTransactionHandler(transactionService),
-		Health:      apihandlers.NewHealthHandler(db),
+
+		/*
+		@handler Health
+		@desc Handles system health checks and readiness probes.
+		*/
+		Health: apihandlers.NewHealthHandler(db),
 	})
 
 	server := &http.Server{
