@@ -32,7 +32,15 @@ type Handlers struct {
 	Withdrawal  *handlers.WithdrawalHandler
 	Transaction *handlers.TransactionHandler
 	Health      *handlers.HealthHandler
+	AdminProtocol    *handlers.AdminProtocolHandler     //  Added for futture
+  /*  AdminMarket      *handlers.AdminMarketHandler       //  ADD FOR FUTURE
+    AdminRisk        *handlers.AdminRiskHandler         //  ADD FOR FUTURE
+    AdminLiquidator  *handlers.AdminLiquidatorHandler   //  ADD FOR FUTURE
+    AdminReputation  *handlers.AdminReputationHandler   //  ADD FOR FUTURE
+    AdminAudit       *handlers.AdminAuditHandler        //  ADD FOR FUTURE
+    AdminStats       *handlers.AdminStatsHandler        //  ADD FOR FUTURE*/
 }
+
 
 /*
 @function Register
@@ -176,7 +184,49 @@ func Register(router *gin.Engine, cfg *config.Config, authService *auth.AuthServ
 			protected.GET("/admin/borrowers/pending", h.AdminBorrowers.GetPendingBorrowers)
 			protected.POST("/admin/borrowers/:address/prepare", h.AdminBorrowers.PrepareBorrowerAddition)
 			protected.DELETE("/admin/borrowers/:address/prepare", h.AdminBorrowers.PrepareBorrowerRemoval)
+            
+			// =============================================
+// ADMIN PROTOCOL CONFIGURATION
+// =============================================
+/*
+@routes AdminProtocolConfiguration
+@desc
+Complete protocol configuration management including fees, core contracts, and upgrades.
+All mutation endpoints return unsigned transaction data for governance execution.
+Upgrades use 2-day timelock mechanism for security.
 
+@auth JWT + ADMIN_ROLE required
+@timelock
+- All implementation upgrades have 2-day timelock
+- Pending upgrades can be viewed and cancelled
+- Admin can propose upgrades, governance executes after timelock
+
+@endpoints
+- GET /protocol/config: Retrieve current protocol configuration
+- POST /protocol/fee/prepare: Prepare transaction to update deployment fee
+- POST /protocol/fee-recipient/prepare: Prepare transaction to update fee recipient
+- GET /protocol/fees-collected: Get accumulated protocol fees
+- POST /protocol/fees/withdraw/prepare: Prepare transaction to withdraw fees
+- GET /contracts/status: Check core contracts initialization status
+- POST /contracts/set-core/prepare: One-time setup for core contracts
+- GET /upgrades/pending: List pending upgrades in timelock queue
+- POST /upgrades/market/prepare: Prepare market implementation upgrade
+- GET /upgrades/timelock-status: Get timelock delay configuration
+- DELETE /upgrades/:upgrade_id/prepare: Cancel pending upgrade
+- GET /upgrades/queue: Get full upgrade queue with execution times
+*/
+protected.GET("/protocol/config", h.AdminProtocol.GetProtocolConfig)
+protected.POST("/protocol/fee/prepare", h.AdminProtocol.SetDeploymentFee)
+protected.POST("/protocol/fee-recipient/prepare", h.AdminProtocol.SetFeeRecipient)
+protected.GET("/protocol/fees-collected", h.AdminProtocol.GetFeesCollected)
+protected.POST("/protocol/fees/withdraw/prepare", h.AdminProtocol.WithdrawFees)
+protected.GET("/contracts/status", h.AdminProtocol.CheckCoreContractsStatus)
+protected.POST("/contracts/set-core/prepare", h.AdminProtocol.SetCoreContracts)
+protected.GET("/upgrades/pending", h.AdminProtocol.ListPendingUpgrades)
+protected.POST("/upgrades/market/prepare", h.AdminProtocol.PrepareMarketUpgrade)
+protected.GET("/upgrades/timelock-status", h.AdminProtocol.GetTimelockStatus)
+protected.DELETE("/upgrades/:upgrade_id/prepare", h.AdminProtocol.CancelUpgrade)
+protected.GET("/upgrades/queue", h.AdminProtocol.GetUpgradeQueue)
 			/*
 			@routes AuthenticatedOffers
 			@desc Let authenticated lenders create and cancel offers.

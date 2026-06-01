@@ -89,15 +89,20 @@ type AdminListResponse struct {
 @struct PaginationInfo
 
 @desc
-Metadata for paginated responses.
+Pagination metadata for list responses.
+Used across all admin list endpoints.
 
 @fields
 - Page: current page number (1-indexed)
 - Limit: results per page
 - Total: total number of items
+- total_pages: total number of pages
+
 */
 type PaginationInfo struct {
 	Page  int32 `json:"page"`
 	Limit int32 `json:"limit"`
 	Total int64 `json:"total"`
+    TotalPages int   `json:"total_pages"`
 }
+    
