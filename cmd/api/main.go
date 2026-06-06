@@ -68,8 +68,20 @@ func main() {
 	/*
 	@construction AuthService
 	@desc Initialize authentication service with JWT manager for SIWE token validation.
+	@fix Pass AuthConfig as third parameter
 	*/
-	authService := auth.NewAuthService(authRepo, jwtMgr)
+	authConfig := &auth.AuthConfig{
+		Domain:     cfg.Auth.Domain,
+		URI:        cfg.Auth.URI,
+		Statement:  cfg.Auth.Statement,
+		Version:    cfg.Auth.Version,
+		ChainID:    cfg.Auth.ChainID,
+		NonceTTL:   cfg.Auth.NonceTTL,
+		SessionTTL: cfg.Auth.SessionTTL,
+	}
+	
+	authService := auth.NewAuthService(authRepo, jwtMgr, authConfig)
+
 
 	/*
 	@construction MarketService

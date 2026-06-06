@@ -76,7 +76,7 @@ func (h *AuthHandler) GetNonce(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
+    
 	nonce, message, err := h.authService.GenerateNonce(c.Request.Context(), req.WalletAddress)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

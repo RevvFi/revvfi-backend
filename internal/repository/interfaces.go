@@ -45,6 +45,11 @@ type AuthRepository interface {
 	StoreSession(ctx context.Context, session *models.AuthSession) error
 	RevokeSession(ctx context.Context, token string) error
 	IsSessionRevoked(ctx context.Context, token string) (bool, error)
+	GetNonce(ctx context.Context, wallet string) (string, error)
+	DeleteNonce(ctx context.Context, wallet string) error
+	ValidateNonceExists(ctx context.Context, wallet string, nonce string) error
+	ConsumeNonceAtomic(ctx context.Context, wallet string, nonce string) error
+	ConsumeNonce(ctx context.Context, wallet string, nonce string) error
 }
 
 /*

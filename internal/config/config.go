@@ -28,6 +28,7 @@ type Config struct {
 	CORS        CORSConfig
 	RateLimit   RateLimitConfig
 	Blockchain  BlockchainConfig
+	Auth        AuthConfig
 }
 
 /*
@@ -140,6 +141,27 @@ type BlockchainConfig struct {
 }
 
 /*
+@struct AuthConfig
+
+@desc
+Defines SIWE authentication configuration.
+
+@responsibilities
+- Configure domain for SIWE messages
+- Configure URI for authentication
+- Configure chain ID for signature verification
+*/
+type AuthConfig struct {
+	Domain    string        `json:"domain"`
+	URI       string        `json:"uri"`
+	Statement string        `json:"statement"`
+	Version   string        `json:"version"`
+	ChainID   int64         `json:"chain_id"`
+	NonceTTL  time.Duration `json:"nonce_ttl"`
+	SessionTTL time.Duration `json:"session_ttl"`
+}
+
+/*
 @function Load
 
 @desc
@@ -206,6 +228,15 @@ func Load() (*Config, error) {
 			PositionNFTAddress:        getEnv("POSITION_NFT_ADDRESS", ""),
 			LiquidatorAddress:         getEnv("LIQUIDATOR_ADDRESS", ""),
 			ReputationRegistryAddress: getEnv("REPUTATION_REGISTRY_ADDRESS", ""),
+		},
+		Auth: AuthConfig{ 
+			Domain:     getEnv("AUTH_DOMAIN", "revvfi.com"),
+			URI:        getEnv("AUTH_URI", "https://revvfi.com/api/v1/auth/login"),
+			Statement:  getEnv("AUTH_STATEMENT", "Sign in to RevvFi Protocol\n\nThis signature will not trigger a blockchain transaction or cost any gas.\n\nBy signing, you agree to the RevvFi Terms of Service (https://revvfi.com/terms)"),
+			Version:    getEnv("AUTH_VERSION", "1"),
+			ChainID:    int64(getIntEnv("AUTH_CHAIN_ID", 1)),
+			NonceTTL:   getDurationEnv("AUTH_NONCE_TTL", 5*time.Minute),
+			SessionTTL: getDurationEnv("AUTH_SESSION_TTL", 24*time.Hour),
 		},
 	}
 
