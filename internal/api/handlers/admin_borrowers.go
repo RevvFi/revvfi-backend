@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -48,67 +49,67 @@ All methods require context for potential async operations.
 */
 type AdminBorrowerServiceInterface interface {
 	/*
-	@method ListBorrowers
-	@desc Retrieve paginated list of all borrowers with filtering.
-	@params
-	- ctx: Request context
-	- page: Page number (1-indexed)
-	- limit: Items per page (1-100)
-	- status: Filter by verification status (optional)
-	- search: Search borrower address/name (optional)
-	@returns
-	- response.BorrowerListResponse: Paginated borrower list
-	- error: Any service error
+		@method ListBorrowers
+		@desc Retrieve paginated list of all borrowers with filtering.
+		@params
+		- ctx: Request context
+		- page: Page number (1-indexed)
+		- limit: Items per page (1-100)
+		- status: Filter by verification status (optional)
+		- search: Search borrower address/name (optional)
+		@returns
+		- response.BorrowerListResponse: Paginated borrower list
+		- error: Any service error
 	*/
 	ListBorrowers(ctx interface{}, page, limit int32, status, search string) (*response.BorrowerListResponse, error)
 
 	/*
-	@method GetBorrower
-	@desc Fetch detailed information about single borrower.
-	@params
-	- ctx: Request context
-	- borrowerAddress: Ethereum address of borrower
-	@returns
-	- response.BorrowerInfo: Borrower details
-	- error: Any service error (e.g., not found)
+		@method GetBorrower
+		@desc Fetch detailed information about single borrower.
+		@params
+		- ctx: Request context
+		- borrowerAddress: Ethereum address of borrower
+		@returns
+		- response.BorrowerInfo: Borrower details
+		- error: Any service error (e.g., not found)
 	*/
 	GetBorrower(ctx interface{}, borrowerAddress string) (*response.BorrowerInfo, error)
 
 	/*
-	@method GetPendingBorrowers
-	@desc Retrieve list of borrowers pending verification.
-	@params
-	- ctx: Request context
-	@returns
-	- response.PendingBorrowerResponse: List of pending borrowers
-	- error: Any service error
+		@method GetPendingBorrowers
+		@desc Retrieve list of borrowers pending verification.
+		@params
+		- ctx: Request context
+		@returns
+		- response.PendingBorrowerResponse: List of pending borrowers
+		- error: Any service error
 	*/
 	GetPendingBorrowers(ctx interface{}) (*response.PendingBorrowerResponse, error)
 
 	/*
-	@method PrepareBorrowerAddition
-	@desc Prepare transaction to add borrower to marketplace.
-	@params
-	- ctx: Request context
-	- borrowerAddress: Address to add
-	- isVerified: Whether to mark as verified
-	@returns
-	- string: Encoded transaction data
-	- error: Any service error
+		@method PrepareBorrowerAddition
+		@desc Prepare transaction to add borrower to marketplace.
+		@params
+		- ctx: Request context
+		- borrowerAddress: Address to add
+		- isVerified: Whether to mark as verified
+		@returns
+		- string: Encoded transaction data
+		- error: Any service error
 	*/
 	PrepareBorrowerAddition(ctx interface{}, borrowerAddress string, isVerified bool) (string, error)
 
 	/*
-	@method PrepareBorrowerRemoval
-	@desc Prepare transaction to remove borrower from marketplace.
-	@params
-	- ctx: Request context
-	- borrowerAddress: Address to remove
-	- reason: Reason for removal (audit trail)
-	- closePositions: Whether to force-close open positions
-	@returns
-	- string: Encoded transaction data
-	- error: Any service error
+		@method PrepareBorrowerRemoval
+		@desc Prepare transaction to remove borrower from marketplace.
+		@params
+		- ctx: Request context
+		- borrowerAddress: Address to remove
+		- reason: Reason for removal (audit trail)
+		- closePositions: Whether to force-close open positions
+		@returns
+		- string: Encoded transaction data
+		- error: Any service error
 	*/
 	PrepareBorrowerRemoval(ctx interface{}, borrowerAddress, reason string, closePositions bool) (string, error)
 }
@@ -166,30 +167,31 @@ Query Parameters:
 @response
 HTTP 200 OK
 Body:
-{
-  "success": true,
-  "data": {
-    "borrowers": [
-      {
-        "address": "0x...",
-        "is_verified": true,
-        "reputation_score": 850,
-        "total_borrowed": "5000000000000000000",
-        "total_repaid": "4500000000000000000",
-        "active_offers": 2,
-        "default_count": 0,
-        "added_at": 1685356800,
-        "verified_at": 1685360000
-      }
-    ],
-    "pagination": {
-      "page": 1,
-      "limit": 20,
-      "total": 150
-    },
-    "total_reputation_average": 820.5
-  }
-}
+
+	{
+	  "success": true,
+	  "data": {
+	    "borrowers": [
+	      {
+	        "address": "0x...",
+	        "is_verified": true,
+	        "reputation_score": 850,
+	        "total_borrowed": "5000000000000000000",
+	        "total_repaid": "4500000000000000000",
+	        "active_offers": 2,
+	        "default_count": 0,
+	        "added_at": 1685356800,
+	        "verified_at": 1685360000
+	      }
+	    ],
+	    "pagination": {
+	      "page": 1,
+	      "limit": 20,
+	      "total": 150
+	    },
+	    "total_reputation_average": 820.5
+	  }
+	}
 
 @error_cases
 - 400: Invalid page/limit values
@@ -199,8 +201,8 @@ Body:
 */
 func (h *AdminBorrowerHandler) ListBorrowers(c *gin.Context) {
 	/*
-	@logic ExtractParameters
-	@desc Extract and validate pagination parameters from query string.
+		@logic ExtractParameters
+		@desc Extract and validate pagination parameters from query string.
 	*/
 	pageStr := c.DefaultQuery("page", "1")
 	limitStr := c.DefaultQuery("limit", "20")
@@ -208,8 +210,8 @@ func (h *AdminBorrowerHandler) ListBorrowers(c *gin.Context) {
 	search := c.Query("search")
 
 	/*
-	@logic ParseParameters
-	@desc Convert string parameters to integers with validation.
+		@logic ParseParameters
+		@desc Convert string parameters to integers with validation.
 	*/
 	page, err := strconv.ParseInt(pageStr, 10, 32)
 	if err != nil || page < 1 {
@@ -236,8 +238,8 @@ func (h *AdminBorrowerHandler) ListBorrowers(c *gin.Context) {
 	}
 
 	/*
-	@logic ValidateStatus
-	@desc Validate status filter if provided.
+		@logic ValidateStatus
+		@desc Validate status filter if provided.
 	*/
 	if status != "" && status != "verified" && status != "pending" && status != "blocked" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -251,8 +253,8 @@ func (h *AdminBorrowerHandler) ListBorrowers(c *gin.Context) {
 	}
 
 	/*
-	@logic CallService
-	@desc Fetch borrower list from service layer.
+		@logic CallService
+		@desc Fetch borrower list from service layer.
 	*/
 	result, err := h.borrowerService.ListBorrowers(c, int32(page), int32(limit), status, search)
 	if err != nil {
@@ -268,8 +270,8 @@ func (h *AdminBorrowerHandler) ListBorrowers(c *gin.Context) {
 	}
 
 	/*
-	@logic ReturnSuccess
-	@desc Return paginated borrower list with metadata.
+		@logic ReturnSuccess
+		@desc Return paginated borrower list with metadata.
 	*/
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -293,20 +295,21 @@ Path Parameters:
 @response
 HTTP 200 OK
 Body:
-{
-  "success": true,
-  "data": {
-    "address": "0x...",
-    "is_verified": true,
-    "reputation_score": 850,
-    "total_borrowed": "5000000000000000000",
-    "total_repaid": "4500000000000000000",
-    "active_offers": 2,
-    "default_count": 0,
-    "added_at": 1685356800,
-    "verified_at": 1685360000
-  }
-}
+
+	{
+	  "success": true,
+	  "data": {
+	    "address": "0x...",
+	    "is_verified": true,
+	    "reputation_score": 850,
+	    "total_borrowed": "5000000000000000000",
+	    "total_repaid": "4500000000000000000",
+	    "active_offers": 2,
+	    "default_count": 0,
+	    "added_at": 1685356800,
+	    "verified_at": 1685360000
+	  }
+	}
 
 @error_cases
 - 400: Invalid/missing address parameter
@@ -315,14 +318,14 @@ Body:
 */
 func (h *AdminBorrowerHandler) GetBorrower(c *gin.Context) {
 	/*
-	@logic ExtractParameter
-	@desc Extract borrower address from URL path.
+		@logic ExtractParameter
+		@desc Extract borrower address from URL path.
 	*/
 	address := c.Param("address")
 
 	/*
-	@logic ValidateAddress
-	@desc Validate address format (basic check, further validation in service).
+		@logic ValidateAddress
+		@desc Validate address format (basic check, further validation in service).
 	*/
 	if address == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -336,8 +339,8 @@ func (h *AdminBorrowerHandler) GetBorrower(c *gin.Context) {
 	}
 
 	/*
-	@logic CallService
-	@desc Fetch borrower from service layer.
+		@logic CallService
+		@desc Fetch borrower from service layer.
 	*/
 	borrower, err := h.borrowerService.GetBorrower(c, address)
 	if err != nil {
@@ -353,8 +356,8 @@ func (h *AdminBorrowerHandler) GetBorrower(c *gin.Context) {
 	}
 
 	/*
-	@logic ReturnSuccess
-	@desc Return borrower details.
+		@logic ReturnSuccess
+		@desc Return borrower details.
 	*/
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -377,25 +380,26 @@ No query parameters required.
 @response
 HTTP 200 OK
 Body:
-{
-  "success": true,
-  "data": {
-    "pending_count": 5,
-    "borrowers": [
-      {
-        "address": "0x...",
-        "is_verified": false,
-        "reputation_score": 0,
-        "total_borrowed": "0",
-        "total_repaid": "0",
-        "active_offers": 0,
-        "default_count": 0,
-        "added_at": 1685356800
-      }
-    ],
-    "oldest_pending_at": 1685356800
-  }
-}
+
+	{
+	  "success": true,
+	  "data": {
+	    "pending_count": 5,
+	    "borrowers": [
+	      {
+	        "address": "0x...",
+	        "is_verified": false,
+	        "reputation_score": 0,
+	        "total_borrowed": "0",
+	        "total_repaid": "0",
+	        "active_offers": 0,
+	        "default_count": 0,
+	        "added_at": 1685356800
+	      }
+	    ],
+	    "oldest_pending_at": 1685356800
+	  }
+	}
 
 @error_cases
 - 401: Unauthorized (not authenticated)
@@ -404,8 +408,8 @@ Body:
 */
 func (h *AdminBorrowerHandler) GetPendingBorrowers(c *gin.Context) {
 	/*
-	@logic CallService
-	@desc Fetch pending borrowers from service layer.
+		@logic CallService
+		@desc Fetch pending borrowers from service layer.
 	*/
 	result, err := h.borrowerService.GetPendingBorrowers(c)
 	if err != nil {
@@ -421,8 +425,8 @@ func (h *AdminBorrowerHandler) GetPendingBorrowers(c *gin.Context) {
 	}
 
 	/*
-	@logic ReturnSuccess
-	@desc Return list of pending borrowers.
+		@logic ReturnSuccess
+		@desc Return list of pending borrowers.
 	*/
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -445,23 +449,25 @@ Path Parameters:
 - address: Ethereum address to add as borrower
 
 Body (JSON):
-{
-  "is_verified": true
-}
+
+	{
+	  "is_verified": true
+	}
 
 @response
 HTTP 200 OK
 Body:
-{
-  "success": true,
-  "data": {
-    "tx_data": "0x...",
-    "target": "0x...",
-    "value": "0",
-    "description": "Add borrower: 0x... (verified)",
-    "encoded_proposal": "0x..."
-  }
-}
+
+	{
+	  "success": true,
+	  "data": {
+	    "tx_data": "0x...",
+	    "target": "0x...",
+	    "value": "0",
+	    "description": "Add borrower: 0x... (verified)",
+	    "encoded_proposal": "0x..."
+	  }
+	}
 
 @error_cases
 - 400: Invalid address or request body
@@ -470,14 +476,14 @@ Body:
 */
 func (h *AdminBorrowerHandler) PrepareBorrowerAddition(c *gin.Context) {
 	/*
-	@logic ExtractParameter
-	@desc Extract borrower address from URL path.
+		@logic ExtractParameter
+		@desc Extract borrower address from URL path.
 	*/
 	address := c.Param("address")
 
 	/*
-	@logic ValidateAddress
-	@desc Validate address format.
+		@logic ValidateAddress
+		@desc Validate address format.
 	*/
 	if address == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -491,14 +497,14 @@ func (h *AdminBorrowerHandler) PrepareBorrowerAddition(c *gin.Context) {
 	}
 
 	/*
-	@logic ParseRequest
-	@desc Parse request body for verification flag.
+		@logic ParseRequest
+		@desc Parse request body for verification flag.
 	*/
 	var req struct {
 		IsVerified bool `json:"is_verified"`
 	}
 
-	if err := c.BindJSON(&req); err != nil {
+	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error": gin.H{
@@ -510,8 +516,8 @@ func (h *AdminBorrowerHandler) PrepareBorrowerAddition(c *gin.Context) {
 	}
 
 	/*
-	@logic CallService
-	@desc Prepare transaction from service layer.
+		@logic CallService
+		@desc Prepare transaction from service layer.
 	*/
 	txData, err := h.borrowerService.PrepareBorrowerAddition(c, address, req.IsVerified)
 	if err != nil {
@@ -527,8 +533,8 @@ func (h *AdminBorrowerHandler) PrepareBorrowerAddition(c *gin.Context) {
 	}
 
 	/*
-	@logic ReturnSuccess
-	@desc Return encoded transaction data.
+		@logic ReturnSuccess
+		@desc Return encoded transaction data.
 	*/
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -553,24 +559,26 @@ Path Parameters:
 - address: Ethereum address to remove
 
 Body (JSON):
-{
-  "reason": "Violation of terms",
-  "close_existing_positions": true
-}
+
+	{
+	  "reason": "Violation of terms",
+	  "close_existing_positions": true
+	}
 
 @response
 HTTP 200 OK
 Body:
-{
-  "success": true,
-  "data": {
-    "tx_data": "0x...",
-    "target": "0x...",
-    "value": "0",
-    "description": "Remove borrower: 0x... (Reason: Violation of terms)",
-    "encoded_proposal": "0x..."
-  }
-}
+
+	{
+	  "success": true,
+	  "data": {
+	    "tx_data": "0x...",
+	    "target": "0x...",
+	    "value": "0",
+	    "description": "Remove borrower: 0x... (Reason: Violation of terms)",
+	    "encoded_proposal": "0x..."
+	  }
+	}
 
 @error_cases
 - 400: Invalid address or request body, missing reason
@@ -580,14 +588,14 @@ Body:
 */
 func (h *AdminBorrowerHandler) PrepareBorrowerRemoval(c *gin.Context) {
 	/*
-	@logic ExtractParameter
-	@desc Extract borrower address from URL path.
+		@logic ExtractParameter
+		@desc Extract borrower address from URL path.
 	*/
 	address := c.Param("address")
 
 	/*
-	@logic ValidateAddress
-	@desc Validate address format.
+		@logic ValidateAddress
+		@desc Validate address format.
 	*/
 	if address == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -601,12 +609,12 @@ func (h *AdminBorrowerHandler) PrepareBorrowerRemoval(c *gin.Context) {
 	}
 
 	/*
-	@logic ParseRequest
-	@desc Parse request body for removal reason and position handling.
+		@logic ParseRequest
+		@desc Parse request body for removal reason and position handling.
 	*/
 	var req request.RemoveBorrowerRequest
 
-	if err := c.BindJSON(&req); err != nil {
+	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error": gin.H{
@@ -618,8 +626,8 @@ func (h *AdminBorrowerHandler) PrepareBorrowerRemoval(c *gin.Context) {
 	}
 
 	/*
-	@logic ValidateRequest
-	@desc Validate required fields in request.
+		@logic ValidateRequest
+		@desc Validate required fields in request.
 	*/
 	if req.Reason == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -633,8 +641,8 @@ func (h *AdminBorrowerHandler) PrepareBorrowerRemoval(c *gin.Context) {
 	}
 
 	/*
-	@logic CallService
-	@desc Prepare transaction from service layer.
+		@logic CallService
+		@desc Prepare transaction from service layer.
 	*/
 	txData, err := h.borrowerService.PrepareBorrowerRemoval(c, address, req.Reason, req.CloseExistingPositions)
 	if err != nil {
@@ -650,8 +658,8 @@ func (h *AdminBorrowerHandler) PrepareBorrowerRemoval(c *gin.Context) {
 	}
 
 	/*
-	@logic ReturnSuccess
-	@desc Return encoded transaction data.
+		@logic ReturnSuccess
+		@desc Return encoded transaction data.
 	*/
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
