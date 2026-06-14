@@ -248,3 +248,109 @@ Returns current UTC time for repository timestamps.
 func now() time.Time {
 	return time.Now().UTC()
 }
+
+/*
+@method BeginTx
+
+@desc
+Starts a new database transaction using the underlying SQL connection.
+A transaction groups multiple database operations into a single unit
+of work. Either all operations succeed and are committed, or all
+changes are rolled back if an error occurs.
+
+@param ctx
+Context used for cancellation, deadlines, and request-scoped values.
+
+@param opts
+Transaction options such as isolation level and read-only mode.
+Pass nil to use the database defaults.
+
+@returns
+*sql.Tx  - Active transaction handle.
+error    - Error if the transaction could not be started.
+
+@example
+tx, err := db.BeginTx(ctx, nil)
+if err != nil {
+    return err
+}
+
+defer tx.Rollback()
+
+_, err = tx.ExecContext(ctx,
+    "INSERT INTO users (name) VALUES ($1)",
+    "Alice",
+)
+if err != nil {
+    return err
+}
+
+return tx.Commit()
+*/
+func (db *DB) BeginTx(
+    ctx context.Context,
+    opts *sql.TxOptions,
+) (*sql.Tx, error) {
+    return db.conn.BeginTx(ctx, opts)
+}
+
+/*
+@method ExecContext
+
+@desc
+Executes a SQL statement that does not return rows.
+
+Typically used for:
+- INSERT
+- UPDATE
+- DELETE
+- TRUNCATE
+- DDL statements (CREATE TABLE, ALTER TABLE, etc.)
+
+The operation respects the provided context and can be cancelled
+or timed out through the context.
+
+@param ctx
+Context used for cancellation and timeout control.
+
+@param query
+SQL query string containing placeholders.
+
+@param args
+Values that replace placeholders in the query.
+
+@returns
+sql.Result - Metadata about the execution such as affected rows.
+error      - Error if execution fails.
+
+@example
+_, err := db.ExecContext(
+    ctx,
+    "UPDATE borrowers SET health_factor = $1 WHERE address = $2",
+    "1.25",
+    borrowerAddress,
+)
+if err != nil {
+    return err
+}
+
+@example
+result, err := db.ExecContext(
+    ctx,
+    "DELETE FROM offers WHERE id = $1",
+    offerID,
+)
+if err != nil {
+    return err
+}
+
+rowsAffected, _ := result.RowsAffected()
+fmt.Printf("Deleted %d rows\n", rowsAffected)
+*/
+func (db *DB) ExecContext(
+    ctx context.Context,
+    query string,
+    args ...any,
+) (sql.Result, error) {
+    return db.conn.ExecContext(ctx, query, args...)
+}
