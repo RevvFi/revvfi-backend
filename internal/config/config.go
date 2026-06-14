@@ -138,6 +138,9 @@ type BlockchainConfig struct {
 	PositionNFTAddress        string
 	LiquidatorAddress         string
 	ReputationRegistryAddress string
+	MarketAddress             string
+	OfferBookAddress          string
+	StartBlock                uint64  // ← ADD THIS
 }
 
 /*
@@ -228,6 +231,8 @@ func Load() (*Config, error) {
 			PositionNFTAddress:        getEnv("POSITION_NFT_ADDRESS", ""),
 			LiquidatorAddress:         getEnv("LIQUIDATOR_ADDRESS", ""),
 			ReputationRegistryAddress: getEnv("REPUTATION_REGISTRY_ADDRESS", ""),
+			  MarketAddress:             getEnv("MARKET_ADDRESS", ""),        
+              OfferBookAddress:          getEnv("OFFERBOOK_ADDRESS", ""),        
 		},
 		Auth: AuthConfig{ 
 			Domain:     getEnv("AUTH_DOMAIN", "revvfi.com"),
