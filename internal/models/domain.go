@@ -331,54 +331,6 @@ type Repayment struct {
 }
 
 /*
-@struct ProcessedEvent
-
-@desc
-Tracks processed blockchain events for idempotency.
-Prevents duplicate event processing during retries.
-
-@fields
-- ID: database identifier
-- TxHash: transaction hash
-- LogIndex: log index
-- BlockNumber: block number
-- EventName: event name
-- ProcessedAt: processing timestamp
-*/
-type ProcessedEvent struct {
-	ID          int64
-	TxHash      string
-	LogIndex    int32
-	BlockNumber int64
-	EventName   string
-	ContractAddress string
-	ProcessedAt time.Time
-}
-
-/*
-@struct ChainCheckpoint
-
-@desc
-Checkpoint for reorg protection during blockchain indexing.
-
-@fields
-- ID: database identifier
-- BlockNumber: block number
-- BlockHash: block hash
-- IsFinalized: if block is finalized
-- ConfirmationCount: number of confirmations
-*/
-type ChainCheckpoint struct {
-	ID              int64
-	BlockNumber     int64
-	BlockHash       string
-	ParentHash      string
-	IsFinalized     bool
-	ConfirmationCount int32
-	ProcessedAt     time.Time
-}
-
-/*
 @struct AuthSession
 
 @desc
