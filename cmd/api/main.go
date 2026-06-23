@@ -13,6 +13,7 @@ import (
 	apihandlers "github.com/Revvfi/revvfi-backend/internal/api/handlers"
 	"github.com/Revvfi/revvfi-backend/internal/api/routes"
 	"github.com/Revvfi/revvfi-backend/internal/config"
+	admincore "github.com/Revvfi/revvfi-backend/internal/core/admin"
 	"github.com/Revvfi/revvfi-backend/internal/core/auth"
 	"github.com/Revvfi/revvfi-backend/internal/core/borrower"
 	"github.com/Revvfi/revvfi-backend/internal/core/liquidation"
@@ -126,12 +127,29 @@ func main() {
 	transactionService := transaction.NewTransactionService()
 
 	/*
+	@construction AdminServices
+	@desc Initialize admin services and their shared repository.
+	*/
+	adminRepo := postgres.NewAdminRepository(db)
+
+	adminAuthService := admincore.NewAdminAuthService(cfg.Blockchain, jwtMgr)
+	adminBorrowerService := admincore.NewAdminBorrowerService(adminRepo, cfg.Blockchain)
+	adminProtocolService := admincore.NewAdminProtocolService(cfg.Blockchain)
+	adminMarketRiskService := admincore.NewAdminMarketRiskService(adminRepo, cfg.Blockchain)
+	adminLiquidatorService := admincore.NewAdminLiquidatorService(adminRepo, cfg.Blockchain)
+	adminReputationService := admincore.NewAdminReputationService(adminRepo, cfg.Blockchain)
+	adminAuditService := admincore.NewAdminAuditService(adminRepo)
+	adminStatsService := admincore.NewAdminStatsService(adminRepo)
+	adminEmergencyService := admincore.NewAdminEmergencyService(adminRepo, cfg.Blockchain)
+	adminSystemService := admincore.NewAdminSystemService(adminRepo, cfg.Blockchain)
+
+	/*
 	@construction HTTPHandlers
 	@desc Initialize all HTTP request handlers with service dependencies.
 	Includes auth, market, admin, offer, position, borrower, liquidation, withdrawal, and transaction handlers.
 	*/
 	router := gin.New()
-	routes.Register(router, cfg, authService, routes.Handlers{
+	routes.Register(router, cfg, authService, adminAuthService, routes.Handlers{
 		/*
 		@handler Auth
 		@desc Handles SIWE authentication, nonce generation, login, and logout operations.
@@ -143,7 +161,67 @@ func main() {
 		@desc Handles administrative market operations including creation, status updates, and metrics.
 		*/
 		Admin: apihandlers.NewAdminHandler(marketService, market.NewValidator()),
-  
+
+		/*
+		@handler AdminAuth
+		@desc Handles admin role verification and impersonation token generation.
+		*/
+		AdminAuth: apihandlers.NewAdminAuthHandler(adminAuthService),
+
+		/*
+		@handler AdminBorrowers
+		@desc Handles admin borrower management and verification operations.
+		*/
+		AdminBorrowers: apihandlers.NewAdminBorrowerHandler(adminBorrowerService),
+
+		/*
+		@handler AdminProtocol
+		@desc Handles admin protocol configuration, fees, and upgrade management.
+		*/
+		AdminProtocol: apihandlers.NewAdminProtocolHandler(adminProtocolService),
+
+		/*
+		@handler AdminMarketRisk
+		@desc Handles admin market risk parameter management.
+		*/
+		AdminMarketRisk: apihandlers.NewAdminMarketRiskHandler(adminMarketRiskService),
+
+		/*
+		@handler AdminLiquidator
+		@desc Handles admin liquidator configuration and active auction management.
+		*/
+		AdminLiquidator: apihandlers.NewAdminLiquidatorHandler(adminLiquidatorService),
+
+		/*
+		@handler AdminReputation
+		@desc Handles admin borrower reputation management.
+		*/
+		AdminReputation: apihandlers.NewAdminReputationHandler(adminReputationService),
+
+		/*
+		@handler AdminAudit
+		@desc Handles admin audit log querying and compliance monitoring.
+		*/
+		AdminAudit: apihandlers.NewAdminAuditHandler(adminAuditService),
+
+		/*
+		@handler AdminStats
+		@desc Handles admin dashboard statistics and analytics.
+		*/
+		AdminStats: apihandlers.NewAdminStatsHandler(adminStatsService),
+
+		/*
+		@handler AdminEmergency
+		@desc Handles emergency protocol controls (pause/unpause/drain fees).
+		*/
+		AdminEmergency: apihandlers.NewAdminEmergencyHandler(adminEmergencyService),
+
+		/*
+		@handler AdminSystem
+		@desc Handles admin system configuration management.
+		*/
+		AdminSystem: apihandlers.NewAdminSystemHandler(adminSystemService),
+
 		/*
 		@handler Market
 		@desc Handles public market queries, creation, and metric retrieval.
@@ -190,7 +268,7 @@ func main() {
 		@handler Health
 		@desc Handles system health checks and readiness probes.
 		*/
-		Health: apihandlers.NewHealthHandler(db),
+		Health: apihandlers.NewHealthHandler(db, cfg.Blockchain.RPCURL),
 	})
 
 	server := &http.Server{

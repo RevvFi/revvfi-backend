@@ -6,6 +6,7 @@ import (
 	"github.com/Revvfi/revvfi-backend/internal/api/handlers"
 	"github.com/Revvfi/revvfi-backend/internal/api/middleware"
 	"github.com/Revvfi/revvfi-backend/internal/config"
+	admincore "github.com/Revvfi/revvfi-backend/internal/core/admin"
 	"github.com/Revvfi/revvfi-backend/internal/core/auth"
 )
 
@@ -20,25 +21,26 @@ Collects HTTP handlers required by route registration.
 - Make endpoint ownership explicit
 */
 type Handlers struct {
-	Auth        *handlers.AuthHandler
-	Admin       *handlers.AdminHandler
-	AdminAuth   *handlers.AdminAuthHandler
-	AdminBorrowers *handlers.AdminBorrowerHandler
-	Market      *handlers.MarketHandler
-	Offer       *handlers.OfferHandler
-	Position    *handlers.PositionHandler
-	Borrower    *handlers.BorrowerHandler
-	Liquidation *handlers.LiquidationHandler
-	Withdrawal  *handlers.WithdrawalHandler
-	Transaction *handlers.TransactionHandler
-	Health      *handlers.HealthHandler
-	AdminProtocol    *handlers.AdminProtocolHandler     //  Added for futture
-  /*  AdminMarket      *handlers.AdminMarketHandler       //  ADD FOR FUTURE
-    AdminRisk        *handlers.AdminRiskHandler         //  ADD FOR FUTURE
-    AdminLiquidator  *handlers.AdminLiquidatorHandler   //  ADD FOR FUTURE
-    AdminReputation  *handlers.AdminReputationHandler   //  ADD FOR FUTURE
-    AdminAudit       *handlers.AdminAuditHandler        //  ADD FOR FUTURE
-    AdminStats       *handlers.AdminStatsHandler        //  ADD FOR FUTURE*/
+	Auth             *handlers.AuthHandler
+	Admin            *handlers.AdminHandler
+	AdminAuth        *handlers.AdminAuthHandler
+	AdminBorrowers   *handlers.AdminBorrowerHandler
+	AdminProtocol    *handlers.AdminProtocolHandler
+	AdminMarketRisk  *handlers.AdminMarketRiskHandler
+	AdminLiquidator  *handlers.AdminLiquidatorHandler
+	AdminReputation  *handlers.AdminReputationHandler
+	AdminAudit       *handlers.AdminAuditHandler
+	AdminStats       *handlers.AdminStatsHandler
+	AdminEmergency   *handlers.AdminEmergencyHandler
+	AdminSystem      *handlers.AdminSystemHandler
+	Market           *handlers.MarketHandler
+	Offer            *handlers.OfferHandler
+	Position         *handlers.PositionHandler
+	Borrower         *handlers.BorrowerHandler
+	Liquidation      *handlers.LiquidationHandler
+	Withdrawal       *handlers.WithdrawalHandler
+	Transaction      *handlers.TransactionHandler
+	Health           *handlers.HealthHandler
 }
 
 
@@ -58,9 +60,10 @@ Registers RevvFi API routes on the provided Gin engine.
 - router: Gin engine
 - cfg: runtime configuration
 - authService: auth service for JWT middleware
+- adminAuthService: admin auth service for admin authorization middleware
 - h: handler collection
 */
-func Register(router *gin.Engine, cfg *config.Config, authService *auth.AuthService, h Handlers) {
+func Register(router *gin.Engine, cfg *config.Config, authService *auth.AuthService, adminAuthService *admincore.AdminAuthService, h Handlers) {
 	router.Use(middleware.Recovery())
 	router.Use(middleware.Logging())
 	router.Use(middleware.CORS(cfg.CORS.AllowedOrigins, cfg.CORS.AllowedMethods, cfg.CORS.AllowedHeaders))
@@ -104,6 +107,7 @@ func Register(router *gin.Engine, cfg *config.Config, authService *auth.AuthServ
 		*/
 		api.GET("/borrowers/:address", h.Borrower.Get)
 		api.GET("/borrowers/:address/risk", h.Borrower.Risk)
+		api.GET("/borrowers/:address/collateral", h.Borrower.Collateral)
 
 		/*
 		@routes PublicLiquidations
@@ -125,120 +129,171 @@ func Register(router *gin.Engine, cfg *config.Config, authService *auth.AuthServ
 
 			/*
 			@routes AuthenticatedMarkets
-			@desc Allow authenticated users to create public markets.
+			@desc REMOVED - Market creation must go through blockchain transactions
+
+			@architecture
+			Markets are created by calling RevvFiFactory.deployMarket() on-chain.
+			The contract emits MarketCreated event which the indexer processes.
+			This API is READ-ONLY for markets.
+
+			Frontend flow:
+			1. User signs transaction with wallet (deployMarket)
+			2. Smart contract emits MarketCreated event
+			3. Indexer catches event and writes to database
+			4. GET /markets returns the indexed market
+
+			@see internal/handlers/market_handler.go for event processing
 			*/
-			protected.POST("/markets", h.Market.Create)
+			// protected.POST("/markets", h.Market.Create) // ❌ REMOVED - Violates blockchain-first architecture
+
 
 			/*
-			@routes Admin
-			@desc
-			Provide authenticated administrative market management and health monitoring.
-			Admin endpoints allow privileged users to create markets, view market metrics,
-			update market operational status, and check system health.
-
-			@endpoints
-			- POST /admin/markets: Create new isolated lending market with custom parameters
-			- GET /admin/markets: List all active markets with pagination and filtering
-			- GET /admin/markets/:address: Retrieve detailed market configuration and state
-			- GET /admin/markets/:address/metrics: Get market analytics and performance metrics
-			- PATCH /admin/markets/:address/status: Update market operational status (active/paused/closed)
-			- GET /admin/health: System health check with TVL, active positions, and uptime metrics
+			@routes AdminProtected
+			@desc All admin routes requiring both authentication and admin role verification.
 			*/
-			protected.POST("/admin/markets", h.Admin.CreateMarket)
-			protected.GET("/admin/markets", h.Admin.ListMarkets)
-			protected.GET("/admin/markets/:address", h.Admin.GetMarket)
-			protected.GET("/admin/markets/:address/metrics", h.Admin.GetMarketMetrics)
-			protected.PATCH("/admin/markets/:address/status", h.Admin.UpdateMarketStatus)
-			protected.GET("/admin/health", h.Admin.HealthCheck)
+			admin := protected.Group("")
+			admin.Use(middleware.AdminAuth(adminAuthService))
+			{
+				/*
+				@routes Admin
+				@desc Administrative market management and health monitoring.
 
-			/*
-			@routes AdminAuthentication
-			@desc
-			Admin authentication and authorization management endpoints.
-			Handles admin role verification, permission checking, and admin impersonation for testing.
+				@architecture
+				Admin market creation removed - must use blockchain transactions.
+				Admins should use the frontend to sign deployMarket() transactions.
+				*/
+				// admin.POST("/admin/markets", h.Admin.CreateMarket) // ❌ REMOVED - Violates blockchain-first architecture
+				admin.GET("/admin/markets", h.Admin.ListMarkets)
+				admin.GET("/admin/markets/:address", h.Admin.GetMarket)
+				admin.GET("/admin/markets/:address/metrics", h.Admin.GetMarketMetrics)
+				admin.PATCH("/admin/markets/:address/status", h.Admin.UpdateMarketStatus)
+				admin.GET("/admin/health", h.Admin.HealthCheck)
 
-			@endpoints
-			- GET /admin/check/:address: Verify if address is admin and retrieve permissions
-			- POST /admin/auth/impersonate: Generate temporary token for admin context switching (dev only)
-			- GET /admin/admins: List all admin addresses with roles and permissions
-			*/
-			protected.GET("/admin/check/:address", h.AdminAuth.CheckAdmin)
-			protected.POST("/admin/auth/impersonate", h.AdminAuth.Impersonate)
-			protected.GET("/admin/admins", h.AdminAuth.ListAdmins)
+				/*
+				@routes AdminAuthentication
+				@desc Admin authentication and authorization management endpoints.
+				*/
+				admin.GET("/admin/check/:address", h.AdminAuth.CheckAdmin)
+				admin.POST("/admin/auth/impersonate", h.AdminAuth.Impersonate)
+				admin.GET("/admin/admins", h.AdminAuth.ListAdmins)
 
-			/*
-			@routes AdminBorrowerManagement
-			@desc
-			Admin endpoints for borrower management and verification.
-			Allows admins to list borrowers, verify/block borrowers, and manage borrower status.
+				/*
+				@routes AdminBorrowerManagement
+				@desc Admin endpoints for borrower management and verification.
+				*/
+				admin.GET("/admin/borrowers", h.AdminBorrowers.ListBorrowers)
+				admin.GET("/admin/borrowers/:address", h.AdminBorrowers.GetBorrower)
+				admin.GET("/admin/borrowers/pending", h.AdminBorrowers.GetPendingBorrowers)
+				admin.POST("/admin/borrowers/:address/prepare", h.AdminBorrowers.PrepareBorrowerAddition)
+				admin.DELETE("/admin/borrowers/:address/prepare", h.AdminBorrowers.PrepareBorrowerRemoval)
 
-			@endpoints
-			- GET /admin/borrowers: List all borrowers with pagination and filtering
-			- GET /admin/borrowers/:address: Retrieve detailed borrower information and metrics
-			- GET /admin/borrowers/pending: List all borrowers awaiting verification
-			- POST /admin/borrowers/:address/prepare: Prepare transaction to add borrower
-			- DELETE /admin/borrowers/:address/prepare: Prepare transaction to remove borrower
-			*/
-			protected.GET("/admin/borrowers", h.AdminBorrowers.ListBorrowers)
-			protected.GET("/admin/borrowers/:address", h.AdminBorrowers.GetBorrower)
-			protected.GET("/admin/borrowers/pending", h.AdminBorrowers.GetPendingBorrowers)
-			protected.POST("/admin/borrowers/:address/prepare", h.AdminBorrowers.PrepareBorrowerAddition)
-			protected.DELETE("/admin/borrowers/:address/prepare", h.AdminBorrowers.PrepareBorrowerRemoval)
-            
-			// =============================================
-// ADMIN PROTOCOL CONFIGURATION
-// =============================================
-/*
-@routes AdminProtocolConfiguration
-@desc
-Complete protocol configuration management including fees, core contracts, and upgrades.
-All mutation endpoints return unsigned transaction data for governance execution.
-Upgrades use 2-day timelock mechanism for security.
+				/*
+				@routes AdminProtocolConfiguration
+				@desc Complete protocol configuration management including fees, core contracts, and upgrades.
+				*/
+				admin.GET("/protocol/config", h.AdminProtocol.GetProtocolConfig)
+				admin.POST("/protocol/fee/prepare", h.AdminProtocol.SetDeploymentFee)
+				admin.POST("/protocol/fee-recipient/prepare", h.AdminProtocol.SetFeeRecipient)
+				admin.GET("/protocol/fees-collected", h.AdminProtocol.GetFeesCollected)
+				admin.POST("/protocol/fees/withdraw/prepare", h.AdminProtocol.WithdrawFees)
+				admin.GET("/contracts/status", h.AdminProtocol.CheckCoreContractsStatus)
+				admin.POST("/contracts/set-core/prepare", h.AdminProtocol.SetCoreContracts)
+				admin.GET("/upgrades/pending", h.AdminProtocol.ListPendingUpgrades)
+				admin.POST("/upgrades/market/prepare", h.AdminProtocol.PrepareMarketUpgrade)
+				admin.GET("/upgrades/timelock-status", h.AdminProtocol.GetTimelockStatus)
+				admin.DELETE("/upgrades/:upgrade_id/prepare", h.AdminProtocol.CancelUpgrade)
+				admin.GET("/upgrades/queue", h.AdminProtocol.GetUpgradeQueue)
 
-@auth JWT + ADMIN_ROLE required
-@timelock
-- All implementation upgrades have 2-day timelock
-- Pending upgrades can be viewed and cancelled
-- Admin can propose upgrades, governance executes after timelock
+				/*
+				@routes AdminMarketRiskParameters
+				@desc Admin market risk parameter management.
+				*/
+				admin.GET("/admin/markets/:address/risk", h.AdminMarketRisk.GetMarketRiskParams)
+				admin.POST("/admin/markets/:address/risk/min-cr/prepare", h.AdminMarketRisk.PrepareSetMinCR)
+				admin.POST("/admin/markets/:address/risk/liquidation-threshold/prepare", h.AdminMarketRisk.PrepareSetLiqThreshold)
+				admin.POST("/admin/markets/:address/risk/oracle/prepare", h.AdminMarketRisk.PrepareSetOracle)
 
-@endpoints
-- GET /protocol/config: Retrieve current protocol configuration
-- POST /protocol/fee/prepare: Prepare transaction to update deployment fee
-- POST /protocol/fee-recipient/prepare: Prepare transaction to update fee recipient
-- GET /protocol/fees-collected: Get accumulated protocol fees
-- POST /protocol/fees/withdraw/prepare: Prepare transaction to withdraw fees
-- GET /contracts/status: Check core contracts initialization status
-- POST /contracts/set-core/prepare: One-time setup for core contracts
-- GET /upgrades/pending: List pending upgrades in timelock queue
-- POST /upgrades/market/prepare: Prepare market implementation upgrade
-- GET /upgrades/timelock-status: Get timelock delay configuration
-- DELETE /upgrades/:upgrade_id/prepare: Cancel pending upgrade
-- GET /upgrades/queue: Get full upgrade queue with execution times
-*/
-protected.GET("/protocol/config", h.AdminProtocol.GetProtocolConfig)
-protected.POST("/protocol/fee/prepare", h.AdminProtocol.SetDeploymentFee)
-protected.POST("/protocol/fee-recipient/prepare", h.AdminProtocol.SetFeeRecipient)
-protected.GET("/protocol/fees-collected", h.AdminProtocol.GetFeesCollected)
-protected.POST("/protocol/fees/withdraw/prepare", h.AdminProtocol.WithdrawFees)
-protected.GET("/contracts/status", h.AdminProtocol.CheckCoreContractsStatus)
-protected.POST("/contracts/set-core/prepare", h.AdminProtocol.SetCoreContracts)
-protected.GET("/upgrades/pending", h.AdminProtocol.ListPendingUpgrades)
-protected.POST("/upgrades/market/prepare", h.AdminProtocol.PrepareMarketUpgrade)
-protected.GET("/upgrades/timelock-status", h.AdminProtocol.GetTimelockStatus)
-protected.DELETE("/upgrades/:upgrade_id/prepare", h.AdminProtocol.CancelUpgrade)
-protected.GET("/upgrades/queue", h.AdminProtocol.GetUpgradeQueue)
+				/*
+				@routes AdminLiquidatorConfiguration
+				@desc Admin liquidator configuration and auction management.
+				*/
+				admin.GET("/admin/liquidator/config", h.AdminLiquidator.GetLiquidatorConfig)
+				admin.POST("/admin/liquidator/config/prepare", h.AdminLiquidator.PrepareSetLiquidatorParams)
+				admin.GET("/admin/liquidator/auctions", h.AdminLiquidator.GetActiveAuctions)
+				admin.POST("/admin/liquidator/auctions/:auctionID/stop/prepare", h.AdminLiquidator.PrepareStopAuction)
+
+				/*
+				@routes AdminReputationManagement
+				@desc Admin borrower reputation management.
+				*/
+				admin.GET("/admin/reputation/defaulted", h.AdminReputation.GetDefaultedBorrowers)
+				admin.GET("/admin/reputation/:address", h.AdminReputation.GetBorrowerReputation)
+				admin.POST("/admin/reputation/:address/prepare", h.AdminReputation.PrepareSetReputation)
+
+				/*
+				@routes AdminAuditMonitoring
+				@desc Admin audit log querying and compliance monitoring.
+				*/
+				admin.GET("/admin/audit/logs", h.AdminAudit.GetAuditLogs)
+				admin.GET("/admin/audit/stats", h.AdminAudit.GetAuditStats)
+				admin.GET("/admin/audit/export", h.AdminAudit.ExportAuditLogs)
+				admin.GET("/admin/audit/activity/:adminAddress", h.AdminAudit.GetAdminActivity)
+				admin.GET("/admin/audit/actions/:action", h.AdminAudit.GetActionHistory)
+
+				/*
+				@routes AdminDashboardStatistics
+				@desc Admin dashboard statistics and analytics.
+				*/
+				admin.GET("/admin/stats/overview", h.AdminStats.GetOverview)
+				admin.GET("/admin/stats/borrowers", h.AdminStats.GetBorrowerStats)
+				admin.GET("/admin/stats/markets", h.AdminStats.GetMarketStats)
+				admin.GET("/admin/stats/revenue", h.AdminStats.GetRevenueStats)
+				admin.GET("/admin/stats/liquidations", h.AdminStats.GetLiquidationStats)
+				admin.GET("/admin/stats/positions", h.AdminStats.GetPositionStats)
+
+				/*
+				@routes AdminEmergencyControls
+				@desc Emergency protocol controls (pause/unpause/drain fees).
+				*/
+				admin.POST("/admin/emergency/pause/prepare", h.AdminEmergency.PrepareEmergencyPause)
+				admin.POST("/admin/emergency/unpause/prepare", h.AdminEmergency.PrepareEmergencyUnpause)
+				admin.POST("/admin/emergency/drain-fees/prepare", h.AdminEmergency.PrepareDrainFees)
+
+				/*
+				@routes AdminSystemConfiguration
+				@desc Admin system configuration management.
+				*/
+				admin.GET("/admin/system/config", h.AdminSystem.GetSystemConfig)
+				admin.POST("/admin/system/config/prepare", h.AdminSystem.PrepareUpdateSystemConfig)
+			}
+
 			/*
 			@routes AuthenticatedOffers
-			@desc Let authenticated lenders create and cancel offers.
+			@desc REMOVED - Offer creation must go through blockchain transactions
+
+			@architecture
+			Offers are created by calling RevvFiOfferBook.submitOffer() on-chain.
+			The contract emits OfferSubmitted event which the indexer processes.
+			Cancellation also happens on-chain via cancelOffer().
+			This API is READ-ONLY for offers.
+
+			@see internal/handlers/offer_handler.go for event processing
 			*/
-			protected.POST("/offers", h.Offer.Create)
-			protected.DELETE("/offers/:offerID", h.Offer.Cancel)
+			// protected.POST("/offers", h.Offer.Create) // ❌ REMOVED - Violates blockchain-first architecture
+			// protected.DELETE("/offers/:offerID", h.Offer.Cancel) // ❌ REMOVED - Must use blockchain tx
 
 			/*
 			@routes AuthenticatedBorrowers
-			@desc Register borrower wallets and read the authenticated wallet's positions.
+			@desc REMOVED - Borrower registration must go through blockchain (admin action)
+
+			@architecture
+			Only admins can register borrowers via ArchController.registerBorrower().
+			This happens on-chain, emits BorrowerAdded event, indexer processes it.
+
+			@see internal/handlers/arch_controller_handler.go for event processing
+			@see app/(app)/admin/page.tsx for admin UI implementation
 			*/
-			protected.POST("/borrowers/register", h.Borrower.Register)
+			// protected.POST("/borrowers/register", h.Borrower.Register) // ❌ REMOVED - Admin-only on-chain action
 			protected.GET("/positions", h.Position.ListMine)
 			protected.GET("/positions/portfolio", h.Position.Portfolio)
 			protected.GET("/positions/:tokenID", h.Position.Get)

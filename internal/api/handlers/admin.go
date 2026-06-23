@@ -44,7 +44,7 @@ type MarketServiceInterface interface {
 	CreateMarket(ctx context.Context, marketAddr string, borrower, borrowAsset, collateralAsset, collateralOracle string, minRatio, liquidationThreshold int32) (*models.Market, error)
 	GetMarket(ctx context.Context, address string) (*models.Market, error)
 	ListMarkets(ctx context.Context, limit, offset int32) ([]models.Market, error)
-	CalculateMetrics(ctx context.Context, market *models.Market) (map[string]interface{}, error)
+	CalculateMetrics(ctx context.Context, market *models.Market) (map[string]any, error)
 }
 
 /*
@@ -690,13 +690,28 @@ func (h *AdminHandler) GetMarketMetrics(c *gin.Context) {
 	Convert metrics to response format with proper data types.
 	Extract relevant metrics from the metrics map returned by service.
 	*/
+	activePositions := int32(0)
+	if ap, ok := metrics["active_positions"]; ok {
+		switch v := ap.(type) {
+		case int:
+			activePositions = int32(v)
+		case int32:
+			activePositions = v
+		case int64:
+			activePositions = int32(v)
+		}
+	}
+	tvl := ""
+	if t, ok := metrics["tvl"]; ok {
+		tvl, _ = t.(string)
+	}
 	resp := response.MarketMetricsResponse{
-		Address:         marketAddress,
-		TVLHistory:      []response.DataPoint{}, // TODO: fetch historical data from repository
-		APRHistory:      []response.DataPoint{}, // TODO: fetch historical data from repository
-		UtilizationHistory: []response.DataPoint{}, // TODO: fetch historical data from repository
-		ActivePositions: metrics["active_positions"].(int32),
-		TotalVolumeTraded: metrics["tvl"].(string),
+		Address:            marketAddress,
+		TVLHistory:         []response.DataPoint{},
+		APRHistory:         []response.DataPoint{},
+		UtilizationHistory: []response.DataPoint{},
+		ActivePositions:    activePositions,
+		TotalVolumeTraded:  tvl,
 	}
 
 	c.JSON(http.StatusOK, gin.H{
