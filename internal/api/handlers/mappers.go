@@ -208,10 +208,7 @@ Maps an auction domain model to API response DTO.
 - response.AuctionResponse
 */
 func auctionResponse(auction *models.Auction) response.AuctionResponse {
-	remaining := auction.EndTime.Sub(time.Now())
-	if remaining < 0 {
-		remaining = 0
-	}
+	remaining := max(time.Until(auction.EndTime), 0)
 
 	return response.AuctionResponse{
 		AuctionID:        auction.AuctionID,

@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 
 	appErr "github.com/Revvfi/revvfi-backend/internal/pkg/errors"
 )
@@ -28,6 +29,17 @@ Writes a standardized JSON error response from a domain or infrastructure error.
 */
 func writeError(c *gin.Context, err error) {
 	if err == nil {
+		return
+	}
+
+	var ve validator.ValidationErrors
+	if errors.As(err, &ve) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": gin.H{
+				"code":    "INVALID_REQUEST",
+				"message": err.Error(),
+			},
+		})
 		return
 	}
 
@@ -183,7 +195,7 @@ Writes a successful JSON response.
 - status: HTTP status code
 - payload: response payload
 */
-func ok(c *gin.Context, status int, payload interface{}) {
+func ok(c *gin.Context, status int, payload any) {
 	if status == 0 {
 		status = http.StatusOK
 	}

@@ -32,7 +32,7 @@ func TestBuildBorrowTransaction(t *testing.T) {
 		ctx,
 		"0xmarket123",
 		big.NewInt(1000000),
-		1,
+		true,
 		500,
 	)
 
@@ -63,7 +63,7 @@ func TestBuildBorrowTransactionInvalidAmount(t *testing.T) {
 		ctx,
 		"0xmarket123",
 		big.NewInt(0),
-		1,
+		true,
 		500,
 	)
 
@@ -309,7 +309,7 @@ func TestTransactionBuilderBorrowData(t *testing.T) {
 	data := builder.BuildBorrowData(
 		"0xmarket",
 		big.NewInt(1000000),
-		1,
+		true,
 		500,
 	)
 

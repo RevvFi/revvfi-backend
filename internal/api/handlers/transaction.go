@@ -60,7 +60,7 @@ func (h *TransactionHandler) BuildBorrow(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	tx, err := h.service.BuildBorrowTransaction(c.Request.Context(), req.MarketAddress, amount, req.TokenID, req.MaxAPR)
+	tx, err := h.service.BuildBorrowTransaction(c.Request.Context(), req.MarketAddress, amount, req.UseSeniorOnly, req.MaxAPR)
 	if err != nil {
 		writeError(c, err)
 		return

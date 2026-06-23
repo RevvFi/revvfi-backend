@@ -1,12 +1,13 @@
 package offer
 
 import (
-"context"
-"fmt"
-"math/big"
+	"context"
+	"fmt"
+	"math/big"
+	"time"
 
-"github.com/Revvfi/revvfi-backend/internal/models"
-appErr "github.com/Revvfi/revvfi-backend/internal/pkg/errors"
+	"github.com/Revvfi/revvfi-backend/internal/models"
+	appErr "github.com/Revvfi/revvfi-backend/internal/pkg/errors"
 )
 
 /*
@@ -107,6 +108,12 @@ expiryDays int32,
 		return nil, fmt.Errorf("offer validation failed: %w", err)
 	}
 
+	now := time.Now()
+	expiry := now.AddDate(0, 0, int(expiryDays))
+	if expiryDays <= 0 {
+		expiry = now.AddDate(0, 1, 0) // default 30 days
+	}
+
 	offer := &models.Offer{
 		OfferID:         offerID,
 		Lender:          lender,
@@ -116,6 +123,8 @@ expiryDays int32,
 		APR:             apr,
 		Seniority:       seniority,
 		Status:          "active",
+		CreatedAt:       now,
+		Expiry:          expiry,
 	}
 
 	if err := s.offerRepo.CreateOffer(ctx, offer); err != nil {

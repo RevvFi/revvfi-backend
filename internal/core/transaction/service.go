@@ -74,15 +74,15 @@ func (s *TransactionService) BuildBorrowTransaction(
 	ctx context.Context,
 	market string,
 	amount *big.Int,
-	tokenID int64,
-	minAPR int32,
+	useSeniorOnly bool,
+	maxAPR int32,
 ) (map[string]interface{}, error) {
 	// Validate parameters
 	if amount == nil || amount.Cmp(big.NewInt(0)) <= 0 {
 		return nil, appErr.ErrInvalidAmount
 	}
 
-	data := s.builder.BuildBorrowData(market, amount, tokenID, minAPR)
+	data := s.builder.BuildBorrowData(market, amount, useSeniorOnly, maxAPR)
 
 	return map[string]interface{}{
 		"to":    market,

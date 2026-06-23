@@ -16,14 +16,14 @@ Request body for building an unsigned borrow transaction.
 @fields
 - MarketAddress: target market contract
 - Amount: borrow amount in wei
-- TokenID: collateral position token identifier
 - MaxAPR: maximum acceptable APR in basis points
+- UseSeniorOnly: whether to only use senior tranche offers (optional, defaults to false)
 */
 type BorrowTransactionRequest struct {
 	MarketAddress string `json:"market_address" binding:"required,eth_addr"`
 	Amount        string `json:"amount" binding:"required,numeric"`
-	TokenID       int64  `json:"token_id" binding:"required,min=1"`
 	MaxAPR        int32  `json:"max_apr" binding:"required,min=1,max=5000"`
+	UseSeniorOnly bool   `json:"use_senior_only"` // defaults to false if not provided
 }
 
 /*

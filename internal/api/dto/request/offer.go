@@ -26,7 +26,7 @@ type CreateOfferRequest struct {
 	MarketAddress string `json:"market_address" binding:"required,eth_addr"`
 	Amount        string `json:"amount" binding:"required,numeric"`
 	APR           int32  `json:"apr" binding:"required,min=1,max=5000"`
-	Seniority     int16  `json:"seniority" binding:"required,oneof=0 1"`
+	Seniority     int16  `json:"seniority" binding:"omitempty,oneof=0 1"`
 	ExpiryDays    int32  `json:"expiry_days" binding:"required,min=1,max=365"`
 }
 
@@ -67,7 +67,7 @@ type OfferSimulateRequest struct {
 	MarketAddress string `json:"market_address" binding:"required,eth_addr"`
 	Amount        string `json:"amount" binding:"required,numeric"`
 	APR           int32  `json:"apr" binding:"required,min=1,max=5000"`
-	Seniority     int16  `json:"seniority" binding:"required,oneof=0 1"`
+	Seniority     int16  `json:"seniority" binding:"omitempty,oneof=0 1"`
 }
 
 /*

@@ -51,8 +51,8 @@ Builds borrow function call data.
 @params
 - market: market address
 - amount: borrow amount
-- tokenID: collateral token ID
-- minAPR: minimum APR
+- useSeniorOnly: whether to only use senior offers
+- maxAPR: maximum acceptable APR in basis points
 
 @returns
 - string: encoded function call data
@@ -60,22 +60,32 @@ Builds borrow function call data.
 func (b *TransactionBuilder) BuildBorrowData(
 	market string,
 	amount *big.Int,
-	tokenID int64,
-	minAPR int32,
+	useSeniorOnly bool,
+	maxAPR int32,
 ) string {
-	// borrow(uint256 amount, uint256 tokenID, uint32 minAPR)
-	// Function selector: 0x1234abcd (placeholder)
-	selector := "1234abcd"
+	// borrow(uint256 amount, bool useSeniorOnly, uint256 maxAPR)
+	// Function selector: keccak256("borrow(uint256,bool,uint256)")[:4]
+	selector := "138173e8" // Correct selector!
 
-	// Encode parameters (simplified - real implementation would use proper ABI encoding)
-	// amount (32 bytes)
-	amountHex := fmt.Sprintf("%064x", amount)
-	// tokenID (32 bytes)
-	tokenIDHex := fmt.Sprintf("%064x", tokenID)
-	// minAPR (32 bytes)
-	minAPRHex := fmt.Sprintf("%064x", minAPR)
+	// Encode parameters (proper ABI encoding)
+	// amount (32 bytes) - already a *big.Int
+	amountBytes := make([]byte, 32)
+	amount.FillBytes(amountBytes)
+	amountHex := hex.EncodeToString(amountBytes)
 
-	data := "0x" + selector + amountHex + tokenIDHex + minAPRHex
+	// useSeniorOnly (32 bytes, boolean as uint256: 0 or 1)
+	useSeniorHex := "0000000000000000000000000000000000000000000000000000000000000000"
+	if useSeniorOnly {
+		useSeniorHex = "0000000000000000000000000000000000000000000000000000000000000001"
+	}
+
+	// maxAPR (32 bytes) - convert int32 to uint256
+	maxAPRBig := big.NewInt(int64(maxAPR))
+	maxAPRBytes := make([]byte, 32)
+	maxAPRBig.FillBytes(maxAPRBytes)
+	maxAPRHex := hex.EncodeToString(maxAPRBytes)
+
+	data := "0x" + selector + amountHex + useSeniorHex + maxAPRHex
 	return data
 }
 
