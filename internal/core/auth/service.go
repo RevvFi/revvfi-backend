@@ -192,39 +192,51 @@ func (s *AuthService) Login(
 	// Parse SIWE message (FIX #3: Raw field is set here)
 	siweMsg, err := s.parseSIWEMessage(message)
 	if err != nil {
+		fmt.Printf("ERROR Login: parseSIWEMessage failed: %v\n", err)
 		return "", 0, fmt.Errorf("invalid SIWE message: %w", err)
 	}
 
 	// Canonicalize wallet addresses
 	canonicalWallet := common.HexToAddress(wallet).Hex()
 	canonicalParsedAddress := common.HexToAddress(siweMsg.Address).Hex()
+	fmt.Printf("DEBUG Login: wallet=%s parsed=%s\n", canonicalWallet, canonicalParsedAddress)
 
 	if !strings.EqualFold(canonicalWallet, canonicalParsedAddress) {
+		fmt.Printf("ERROR Login: address mismatch\n")
 		return "", 0, Errors.ErrAddressMismatch
 	}
 
 	// FIX #9: Validate nonce format
 	if len(siweMsg.Nonce) < MinNonceLength || len(siweMsg.Nonce) > MaxNonceLength {
+		fmt.Printf("ERROR Login: nonce length invalid: %d\n", len(siweMsg.Nonce))
 		return "", 0, appErr.ErrInvalidNonce
 	}
 	if !nonceRegex.MatchString(siweMsg.Nonce) {
+		fmt.Printf("ERROR Login: nonce format invalid: %s\n", siweMsg.Nonce)
 		return "", 0, Errors.ErrInvalidNonceFormat
 	}
+	fmt.Printf("DEBUG Login: nonce validated: %s\n", siweMsg.Nonce)
 
 	// Validate nonce exists (read-only - does NOT consume)
 	if err := s.authRepo.ValidateNonceExists(ctx, canonicalWallet, siweMsg.Nonce); err != nil {
+		fmt.Printf("ERROR Login: ValidateNonceExists failed: %v\n", err)
 		return "", 0, err
 	}
+	fmt.Printf("DEBUG Login: nonce exists in DB\n")
 
 	// Validate all SIWE fields
 	if err := s.validateSIWEMessage(siweMsg); err != nil {
+		fmt.Printf("ERROR Login: validateSIWEMessage failed: %v\n", err)
 		return "", 0, err
 	}
+	fmt.Printf("DEBUG Login: SIWE message validated (domain=%s, URI=%s, chainID=%d)\n", siweMsg.Domain, siweMsg.URI, siweMsg.ChainID)
 
 	// Verify signature (with explicit crypto.VerifySignature)
 	if err := s.verifySignature(siweMsg, signature, canonicalWallet); err != nil {
+		fmt.Printf("ERROR Login: verifySignature failed: %v\n", err)
 		return "", 0, err
 	}
+	fmt.Printf("DEBUG Login: signature verified\n")
 
 	// FIX #2: Atomically consume the nonce
 	if err := s.authRepo.ConsumeNonceAtomic(ctx, canonicalWallet, siweMsg.Nonce); err != nil {
@@ -447,8 +459,8 @@ func (s *AuthService) validateURI(uriStr string) error {
 		return fmt.Errorf("invalid URI scheme: %s (only https/http allowed)", parsed.Scheme)
 	}
 
-	// Validate host matches config domain
-	host := parsed.Hostname()
+	// Validate host matches config domain; use parsed.Host (not Hostname) to retain port
+	host := parsed.Host
 	if host != s.config.Domain {
 		return fmt.Errorf("URI host %s does not match expected domain %s", host, s.config.Domain)
 	}
