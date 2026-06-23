@@ -353,3 +353,79 @@ type AuthSession struct {
 	RevokedAt     sql.NullTime
 	CreatedAt     time.Time
 }
+
+/*
+@struct CollateralBalance
+
+@desc
+Tracks a borrower's collateral balance held in the RevvFiCollateralEscrow.
+Populated from CollateralDeposited and CollateralWithdrawn events.
+The Balance field reflects the authoritative on-chain total from the event's
+Total field; cumulative fields enable historical analysis.
+
+@fields
+- ID: database identifier
+- Borrower: borrower wallet address (unique per escrow)
+- Balance: current total collateral (authoritative, from event Total field)
+- TotalDeposited: cumulative sum of all deposit amounts
+- TotalWithdrawn: cumulative sum of all withdrawal amounts
+- LastDepositAt: timestamp of most recent deposit
+- LastWithdrawalAt: timestamp of most recent withdrawal
+- UpdatedAt: last record update timestamp
+*/
+type CollateralBalance struct {
+	ID               int64
+	Borrower         string
+	Balance          *big.Int
+	TotalDeposited   *big.Int
+	TotalWithdrawn   *big.Int
+	LastDepositAt    sql.NullTime
+	LastWithdrawalAt sql.NullTime
+	UpdatedAt        time.Time
+}
+
+/*
+@struct ControllerFactory
+
+@desc
+Represents a controller factory registered in the RevvFiArchController.
+Populated from ControllerFactoryAdded/Removed events.
+A factory can create new market controller instances.
+
+@fields
+- ID: database identifier
+- Address: factory contract address
+- AddedAt: timestamp when factory was registered
+- RemovedAt: timestamp when factory was deregistered (null if active)
+- BlockNumber: block number of the registration event
+*/
+type ControllerFactory struct {
+	ID          int64
+	Address     string
+	AddedAt     time.Time
+	RemovedAt   sql.NullTime
+	BlockNumber int64
+}
+
+/*
+@struct Controller
+
+@desc
+Represents a controller registered in the RevvFiArchController.
+Populated from ControllerAdded/Removed events.
+Controllers govern market creation and administrative functions.
+
+@fields
+- ID: database identifier
+- Address: controller contract address (from ControllerFactory field)
+- AddedAt: timestamp when controller was registered
+- RemovedAt: timestamp when controller was deregistered (null if active)
+- BlockNumber: block number of the registration event
+*/
+type Controller struct {
+	ID          int64
+	Address     string
+	AddedAt     time.Time
+	RemovedAt   sql.NullTime
+	BlockNumber int64
+}

@@ -102,7 +102,7 @@ Includes error code, message, and optional details.
 type AppError struct {
 	Code    string      `json:"code"`
 	Message string      `json:"message"`
-	Details interface{} `json:"details,omitempty"`
+	Details any `json:"details,omitempty"`
 	Err     error       `json:"-"`
 }
 
@@ -169,7 +169,7 @@ Creates new AppError with details.
 @returns
 - *AppError
 */
-func NewAppErrorWithDetails(code string, message string, details interface{}, err error) *AppError {
+func NewAppErrorWithDetails(code string, message string, details any, err error) *AppError {
 	return &AppError{
 		Code:    code,
 		Message: message,
@@ -236,12 +236,40 @@ func ErrorCode(err error) string {
 		return "UNAUTHORIZED"
 	case ErrInvalidToken:
 		return "INVALID_TOKEN"
+	case ErrInvalidNonce:
+		return "INVALID_NONCE"
 	case ErrMarketNotFound:
 		return "MARKET_NOT_FOUND"
+	case ErrPositionNotFound:
+		return "POSITION_NOT_FOUND"
 	case ErrOfferNotFound:
 		return "OFFER_NOT_FOUND"
+	case ErrBorrowerNotFound:
+		return "BORROWER_NOT_FOUND"
+	case ErrAuctionNotFound:
+		return "AUCTION_NOT_FOUND"
+	case ErrWithdrawalNotFound:
+		return "WITHDRAWAL_NOT_FOUND"
+	case ErrWithdrawalEpochNotFound:
+		return "EPOCH_NOT_FOUND"
+	case ErrInvalidInput, ErrInvalidAddress, ErrInvalidAmount, ErrInvalidAPR:
+		return "INVALID_REQUEST"
 	case ErrInsufficientLiquidity:
 		return "INSUFFICIENT_LIQUIDITY"
+	case ErrInsufficientCollateral:
+		return "INSUFFICIENT_COLLATERAL"
+	case ErrMarketClosed:
+		return "MARKET_CLOSED"
+	case ErrMarketLiquidating:
+		return "MARKET_LIQUIDATING"
+	case ErrOfferExpired:
+		return "OFFER_EXPIRED"
+	case ErrAuctionNotActive:
+		return "AUCTION_NOT_ACTIVE"
+	case ErrAuctionAlreadySettled:
+		return "AUCTION_ALREADY_SETTLED"
+	case ErrNotLiquidatable:
+		return "NOT_LIQUIDATABLE"
 	default:
 		return "INTERNAL_ERROR"
 	}
