@@ -92,3 +92,21 @@ func (h *BorrowerHandler) Risk(c *gin.Context) {
 	}
 	ok(c, http.StatusOK, risk)
 }
+
+/*
+@method Collateral
+
+@desc
+Handles borrower collateral balance requests.
+
+@params
+- c: Gin context
+*/
+func (h *BorrowerHandler) Collateral(c *gin.Context) {
+	collateral, err := h.service.GetCollateralBalance(c.Request.Context(), c.Param("address"))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	ok(c, http.StatusOK, collateral)
+}

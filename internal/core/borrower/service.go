@@ -48,6 +48,7 @@ type BorrowerRepository interface {
 	CreateBorrower(ctx context.Context, borrower *models.Borrower) error
 	GetByAddress(ctx context.Context, address string) (*models.Borrower, error)
 	UpdateBorrower(ctx context.Context, borrower *models.Borrower) error
+	GetCollateralBalance(ctx context.Context, address string) (*models.CollateralBalance, error)
 }
 
 /*
@@ -277,4 +278,29 @@ address string,
 		"success_rate":     borrower.SuccessRate,
 		"default_rate":     float64(borrower.DefaultedLoans) / float64(borrower.TotalLoans) * 100,
 	}, nil
+}
+
+/*
+@function GetCollateralBalance
+
+@desc
+Returns borrower's collateral balance from database.
+
+@params
+- ctx: request context
+- address: borrower address
+
+@returns
+- *models.CollateralBalance: collateral balance data
+- error: if query fails
+*/
+func (s *BorrowerService) GetCollateralBalance(
+ctx context.Context,
+address string,
+) (*models.CollateralBalance, error) {
+	collateral, err := s.borrowerRepo.GetCollateralBalance(ctx, address)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch collateral balance: %w", err)
+	}
+	return collateral, nil
 }

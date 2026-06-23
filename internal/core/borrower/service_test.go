@@ -1,12 +1,12 @@
 package borrower
 
 import (
-"context"
-"math/big"
-"testing"
+	"context"
+	"math/big"
+	"testing"
 
-"github.com/Revvfi/revvfi-backend/internal/models"
-appErr "github.com/Revvfi/revvfi-backend/internal/pkg/errors"
+	"github.com/Revvfi/revvfi-backend/internal/models"
+	appErr "github.com/Revvfi/revvfi-backend/internal/pkg/errors"
 )
 
 /*
@@ -24,7 +24,7 @@ Tests reputation tracking and risk assessment.
 - GetRiskAssessment: risk calculation
 */
 
-// MockBorrowerRepository implements BorrowerRepository interface
+// MockBorrowerRepository implements the BorrowerRepository interface defined in service.go
 type MockBorrowerRepository struct {
 	borrowers map[string]*models.Borrower
 }
@@ -53,6 +53,10 @@ func (m *MockBorrowerRepository) UpdateBorrower(ctx context.Context, borrower *m
 	}
 	m.borrowers[borrower.Address] = borrower
 	return nil
+}
+
+func (m *MockBorrowerRepository) GetCollateralBalance(ctx context.Context, address string) (*models.CollateralBalance, error) {
+	return nil, nil
 }
 
 func TestRegisterBorrower(t *testing.T) {

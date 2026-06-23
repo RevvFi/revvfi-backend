@@ -86,6 +86,37 @@ func (r *BorrowerRepository) Update(ctx context.Context, borrower *models.Borrow
 }
 
 /*
+@method GetCollateralBalance
+
+@desc
+Fetches a borrower's collateral balance from the collateral_balances table.
+*/
+func (r *BorrowerRepository) GetCollateralBalance(ctx context.Context, address string) (*models.CollateralBalance, error) {
+	row := r.db.conn.QueryRowContext(ctx, `
+		SELECT borrower, balance, total_deposited, total_withdrawn, last_deposit_at, last_withdrawal_at, updated_at
+		FROM collateral_balances
+		WHERE borrower = $1
+	`, address)
+
+	var c models.CollateralBalance
+	var balance, deposited, withdrawn string
+	err := row.Scan(&c.Borrower, &balance, &deposited, &withdrawn, &c.LastDepositAt, &c.LastWithdrawalAt, &c.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	// Parse string values to big.Int
+	c.Balance = parseInt(balance)
+	c.TotalDeposited = parseInt(deposited)
+	c.TotalWithdrawn = parseInt(withdrawn)
+
+	return &c, nil
+}
+
+/*
 @method UpdateReputation
 
 @desc
