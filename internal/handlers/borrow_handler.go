@@ -15,7 +15,7 @@ import (
  * @event Borrow: Borrower accepts offers and receives funds
  */
 type BorrowHandler struct {
-    eventRepo *postgres.EventRepository
+	eventRepo *postgres.EventRepository
 }
 
 /*@
@@ -23,7 +23,7 @@ type BorrowHandler struct {
  * @desc Creates a new borrow handler instance
  */
 func NewBorrowHandler(eventRepo *postgres.EventRepository) *BorrowHandler {
-    return &BorrowHandler{eventRepo: eventRepo}
+	return &BorrowHandler{eventRepo: eventRepo}
 }
 
 /*@
@@ -33,11 +33,11 @@ func NewBorrowHandler(eventRepo *postgres.EventRepository) *BorrowHandler {
  * @param blockNum Block number where borrow occurred
  */
 func (h *BorrowHandler) Handle(ctx context.Context, event interface{}, blockNum uint64) error {
-    e, ok := event.(*types.BorrowEvent)
-    if !ok {
-        return nil
-    }
-    return h.handleBorrow(ctx, e, blockNum)
+	e, ok := event.(*types.BorrowEvent)
+	if !ok {
+		return nil
+	}
+	return h.handleBorrow(ctx, e, blockNum)
 }
 
 /*@
@@ -47,8 +47,9 @@ func (h *BorrowHandler) Handle(ctx context.Context, event interface{}, blockNum 
  * @param blockNum Block number where borrow occurred
  */
 func (h *BorrowHandler) handleBorrow(ctx context.Context, event *types.BorrowEvent, blockNum uint64) error {
-    // Update market total debt
-    log.Printf("Borrow: Borrower=%s, Amount=%s, WeightedAPR=%d", 
-        event.Borrower.Hex(), event.Amount.String(), event.WeightedAPR)
-    return nil
+	// Update market total debt
+	log.Printf("Borrow: Borrower=%s, Amount=%s, WeightedAPR=%d",
+		event.Borrower.Hex(), event.Amount.String(), event.WeightedAPR)
+	return nil
 }
+

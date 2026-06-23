@@ -3,11 +3,12 @@ package handlers
 
 import (
     "context"
+    "log"
     "time"
 
+    "github.com/Revvfi/revvfi-backend/internal/indexer/types"
     "github.com/Revvfi/revvfi-backend/internal/models"
     "github.com/Revvfi/revvfi-backend/internal/repository/postgres"
-    "github.com/Revvfi/revvfi-backend/internal/indexer/types"
 )
 
 /*@
@@ -51,6 +52,8 @@ func (h *MarketHandler) Handle(ctx context.Context, event interface{}, blockNum 
         return h.handleMarketUnpaused(ctx, e, blockNum)
     case *types.InterestAccruedEvent:
         return h.handleInterestAccrued(ctx, e, blockNum)
+    case *types.MarketClosedEvent:
+        return h.handleMarketClosed(ctx, e, blockNum)
     }
     return nil
 }
@@ -108,4 +111,18 @@ func (h *MarketHandler) handleMarketUnpaused(ctx context.Context, event *types.M
  */
 func (h *MarketHandler) handleInterestAccrued(ctx context.Context, event *types.InterestAccruedEvent, blockNum uint64) error {
     return h.eventRepo.UpdateMarketBorrowIndex(ctx, event.Market.Hex())
+}
+
+/*@
+ * handleMarketClosed
+ * @desc Processes MarketClosedEvent - permanently closes the market
+ * @param event Decoded MarketClosed event containing borrower and timestamp
+ * @param blockNum Block number where market was closed
+ * @note Sets is_closed=true and is_active=false; closed markets cannot be reopened.
+ *       The Borrower field identifies which borrower's market was closed.
+ */
+func (h *MarketHandler) handleMarketClosed(ctx context.Context, event *types.MarketClosedEvent, blockNum uint64) error {
+    log.Printf("MarketClosed: Borrower=%s Timestamp=%d Block=%d",
+        event.Borrower.Hex(), event.Timestamp.Int64(), blockNum)
+    return h.eventRepo.CloseMarket(ctx, event.Borrower.Hex())
 }

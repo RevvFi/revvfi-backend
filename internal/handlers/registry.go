@@ -50,30 +50,38 @@ r.Register("ImplementationsSet", NewImplementationHandler(eventRepo))
 r.Register("OwnershipTransferred", NewOwnershipHandler(eventRepo))
 
 // ============================================
-// MARKET EVENTS (RevvFiMarket) - 8 events
+// MARKET EVENTS (RevvFiMarket) - 9 events
 // ============================================
 r.Register("Borrow", NewBorrowHandler(eventRepo))
 r.Register("Repay", NewRepayHandler(eventRepo))
 r.Register("InterestAccrued", NewInterestHandler(eventRepo))
 r.Register("CollateralDeposited", NewCollateralHandler(eventRepo))
 r.Register("CollateralWithdrawn", NewCollateralHandler(eventRepo))
+r.Register("CollateralLiquidated", NewCollateralHandler(eventRepo))
+r.Register("MarketClosedEvent", NewMarketHandler(eventRepo)) // contract emits "MarketClosedEvent"
 r.Register("MarketPaused", NewMarketHandler(eventRepo))
 r.Register("MarketUnpaused", NewMarketHandler(eventRepo))
 r.Register("LiquidationExecuted", NewLiquidationHandler(eventRepo))
+r.Register("LiquidationStartedMarket", NewLiquidationHandler(eventRepo))
+r.Register("LiquidationEndedMarket", NewLiquidationHandler(eventRepo))
+r.Register("ContractsSet", NewMarketHandler(eventRepo))    // signal-only, no DB write
+r.Register("DrawdownExecuted", NewMarketHandler(eventRepo)) // complex array type, no DB write
 
 // ============================================
-// OFFERBOOK EVENTS (RevvFiOfferBook) - 4 events
+// OFFERBOOK EVENTS (RevvFiOfferBook) - 5 events
 // ============================================
 r.Register("OfferSubmitted", NewOfferHandler(eventRepo))
 r.Register("OfferCancelled", NewOfferHandler(eventRepo))
 r.Register("OfferFilled", NewOfferHandler(eventRepo))
 r.Register("OfferModified", NewOfferHandler(eventRepo))
+r.Register("DrawdownExecutedOffer", NewOfferHandler(eventRepo))
 
 // ============================================
-// POSITION NFT EVENTS (RevvFiPositionNFT) - 4 events
+// POSITION NFT EVENTS (RevvFiPositionNFT) - 5 events
 // ============================================
 r.Register("PositionMinted", NewPositionHandler(eventRepo))
 r.Register("PositionSettled", NewPositionHandler(eventRepo))
+r.Register("PositionRedeemed", NewPositionHandler(eventRepo))
 r.Register("PositionClaimed", NewPositionHandler(eventRepo))
 r.Register("Transfer", NewPositionHandler(eventRepo))
 
@@ -94,24 +102,42 @@ r.Register("WithdrawalCancelled", NewWithdrawalHandler(eventRepo))
 r.Register("EpochProcessed", NewEpochHandler(eventRepo))
 
 // ============================================
-// REPUTATION REGISTRY EVENTS (ReputationRegistry) - 4 events
+// REPUTATION REGISTRY EVENTS (ReputationRegistry) - 5 events
 // ============================================
 r.Register("ReputationScoreUpdated", NewReputationHandler(eventRepo))
 r.Register("BorrowerRegistered", NewReputationHandler(eventRepo))
 r.Register("SuccessfulRepaymentRecorded", NewReputationHandler(eventRepo))
 r.Register("DefaultRecorded", NewReputationHandler(eventRepo))
+r.Register("BorrowActivityRecorded", NewReputationHandler(eventRepo))
 
 // ============================================
-// ARCH CONTROLLER EVENTS (RevvFiArchController) - 6 events
+// ARCH CONTROLLER EVENTS (RevvFiArchController) - 14 events
 // ============================================
 r.Register("BorrowerAdded", NewArchControllerHandler(eventRepo))
 r.Register("BorrowerRemoved", NewArchControllerHandler(eventRepo))
 r.Register("ControllerAdded", NewArchControllerHandler(eventRepo))
 r.Register("ControllerRemoved", NewArchControllerHandler(eventRepo))
+r.Register("ControllerFactoryAdded", NewArchControllerHandler(eventRepo))
+r.Register("ControllerFactoryRemoved", NewArchControllerHandler(eventRepo))
+r.Register("MarketAdded", NewArchControllerHandler(eventRepo))
+r.Register("MarketRemoved", NewArchControllerHandler(eventRepo))
 r.Register("MarketRegistered", NewArchControllerHandler(eventRepo))
 r.Register("MarketUnregistered", NewArchControllerHandler(eventRepo))
-r.Register("OwnerUpdated", NewArchControllerHandler(eventRepo))  
-r.Register("TimelockUpdated", NewArchControllerHandler(eventRepo))  
+r.Register("OwnerUpdated", NewArchControllerHandler(eventRepo))
+r.Register("TimelockUpdated", NewArchControllerHandler(eventRepo))
+r.Register("AssetBlacklisted", NewArchControllerHandler(eventRepo))
+r.Register("AssetPermitted", NewArchControllerHandler(eventRepo))
+
+// ============================================
+// COLLATERAL ESCROW EVENTS (RevvFiCollateralEscrow)
+// ============================================
+r.Register("MinCollateralRatioUpdated", NewCollateralHandler(eventRepo))
+r.Register("LiquidationThresholdUpdated", NewCollateralHandler(eventRepo))
+
+// ============================================
+// COMMON / MISC EVENTS
+// ============================================
+r.Register("Initialized", NewMarketHandler(eventRepo)) // OZ initializer signal, no DB write
     return r
 }
 

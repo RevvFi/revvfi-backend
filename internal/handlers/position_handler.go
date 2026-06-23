@@ -3,6 +3,7 @@ package handlers
 
 import (
 	"context"
+	"log"
 	"math/big"
 	"time"
 
@@ -17,6 +18,7 @@ import (
  * @events
  *   - PositionMinted: New lender position created
  *   - PositionSettled: Position fully repaid and settled
+ *   - PositionRedeemed: Lender redeems position NFT for principal + interest
  *   - Transfer: Position NFT transferred between wallets
  */
 type PositionHandler struct {
@@ -41,6 +43,8 @@ func (h *PositionHandler) Handle(ctx context.Context, event interface{}, blockNu
         return h.handlePositionMinted(ctx, e, blockNum)
     case *types.PositionSettledEvent:
         return h.handlePositionSettled(ctx, e, blockNum)
+    case *types.PositionRedeemedEvent:
+        return h.handlePositionRedeemed(ctx, e, blockNum)
     case *types.PositionTransferEvent:
         return h.handlePositionTransfer(ctx, e, blockNum)
     }
@@ -82,6 +86,20 @@ func (h *PositionHandler) handlePositionMinted(ctx context.Context, event *types
  */
 func (h *PositionHandler) handlePositionSettled(ctx context.Context, event *types.PositionSettledEvent, blockNum uint64) error {
     return h.eventRepo.SettlePosition(ctx, event.TokenID.Int64(), event.ClaimableAmount)
+}
+
+/*@
+ * handlePositionRedeemed
+ * @desc Processes PositionRedeemed event - marks position as redeemed and deactivates it
+ * @param event Decoded PositionRedeemed event with token ID, principal, and interest
+ * @param blockNum Block number where redemption occurred
+ * @note Claimable amount is set to principal + interest so APIs can display the total payout.
+ *       Once redeemed, the NFT is burned and the position record is permanently inactive.
+ */
+func (h *PositionHandler) handlePositionRedeemed(ctx context.Context, event *types.PositionRedeemedEvent, blockNum uint64) error {
+    log.Printf("PositionRedeemed: TokenID=%d Principal=%s Interest=%s Block=%d",
+        event.TokenID.Int64(), event.Principal.String(), event.Interest.String(), blockNum)
+    return h.eventRepo.RedeemPosition(ctx, event.TokenID.Int64(), event.Principal, event.Interest)
 }
 
 /*@
