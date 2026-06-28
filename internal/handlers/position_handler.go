@@ -22,7 +22,7 @@ import (
  *   - Transfer: Position NFT transferred between wallets
  */
 type PositionHandler struct {
-    eventRepo *postgres.EventRepository
+	eventRepo *postgres.EventRepository
 }
 
 /*@
@@ -30,7 +30,7 @@ type PositionHandler struct {
  * @desc Creates a new position handler instance
  */
 func NewPositionHandler(eventRepo *postgres.EventRepository) *PositionHandler {
-    return &PositionHandler{eventRepo: eventRepo}
+	return &PositionHandler{eventRepo: eventRepo}
 }
 
 /*@
@@ -38,17 +38,17 @@ func NewPositionHandler(eventRepo *postgres.EventRepository) *PositionHandler {
  * @desc Routes position events to appropriate handler methods
  */
 func (h *PositionHandler) Handle(ctx context.Context, event interface{}, blockNum uint64) error {
-    switch e := event.(type) {
-    case *types.PositionMintedEvent:
-        return h.handlePositionMinted(ctx, e, blockNum)
-    case *types.PositionSettledEvent:
-        return h.handlePositionSettled(ctx, e, blockNum)
-    case *types.PositionRedeemedEvent:
-        return h.handlePositionRedeemed(ctx, e, blockNum)
-    case *types.PositionTransferEvent:
-        return h.handlePositionTransfer(ctx, e, blockNum)
-    }
-    return nil
+	switch e := event.(type) {
+	case *types.PositionMintedEvent:
+		return h.handlePositionMinted(ctx, e, blockNum)
+	case *types.PositionSettledEvent:
+		return h.handlePositionSettled(ctx, e, blockNum)
+	case *types.PositionRedeemedEvent:
+		return h.handlePositionRedeemed(ctx, e, blockNum)
+	case *types.PositionTransferEvent:
+		return h.handlePositionTransfer(ctx, e, blockNum)
+	}
+	return nil
 }
 
 /*@
@@ -58,24 +58,23 @@ func (h *PositionHandler) Handle(ctx context.Context, event interface{}, blockNu
  * @param blockNum Block number where position was minted
  */
 func (h *PositionHandler) handlePositionMinted(ctx context.Context, event *types.PositionMintedEvent, blockNum uint64) error {
-    position := &models.Position{
-        TokenID:          event.TokenID.Int64(),
-        Lender:           event.Lender.Hex(),
-        MarketAddress:    event.Market.Hex(),
-        Principal:        event.Principal,
-        CurrentPrincipal: event.Principal,
-        AccruedInterest:  big.NewInt(0),
-        ClaimableAmount:  big.NewInt(0),
-        APR:              int32(event.APR.Int64()),
-        Seniority:        int16(event.Seniority),
-        Status:           "active",
-        IsActive:         true,
-        IsSettled:        false,
-        MintedAt:         time.Now(),
-        BlockNumber:      int64(blockNum),
-    }
-    
-    return h.eventRepo.SavePosition(ctx, position)
+	position := &models.Position{
+		TokenID:          event.TokenID.Int64(),
+		Lender:           event.Lender.Hex(),
+		MarketAddress:    event.Market.Hex(),
+		Principal:        event.Principal,
+		CurrentPrincipal: event.Principal,
+		AccruedInterest:  big.NewInt(0),
+		ClaimableAmount:  big.NewInt(0),
+		APR:              int32(event.APR.Int64()),
+		Seniority:        int16(event.Seniority),
+		Status:           "active",
+		IsActive:         true,
+		IsSettled:        false,
+		MintedAt:         time.Now(),
+		BlockNumber:      int64(blockNum),
+	}
+	return h.eventRepo.SavePosition(ctx, position)
 }
 
 /*@
@@ -85,7 +84,7 @@ func (h *PositionHandler) handlePositionMinted(ctx context.Context, event *types
  * @param blockNum Block number where position was settled
  */
 func (h *PositionHandler) handlePositionSettled(ctx context.Context, event *types.PositionSettledEvent, blockNum uint64) error {
-    return h.eventRepo.SettlePosition(ctx, event.TokenID.Int64(), event.ClaimableAmount)
+	return h.eventRepo.SettlePosition(ctx, event.TokenID.Int64(), event.ClaimableAmount)
 }
 
 /*@
@@ -97,9 +96,9 @@ func (h *PositionHandler) handlePositionSettled(ctx context.Context, event *type
  *       Once redeemed, the NFT is burned and the position record is permanently inactive.
  */
 func (h *PositionHandler) handlePositionRedeemed(ctx context.Context, event *types.PositionRedeemedEvent, blockNum uint64) error {
-    log.Printf("PositionRedeemed: TokenID=%d Principal=%s Interest=%s Block=%d",
-        event.TokenID.Int64(), event.Principal.String(), event.Interest.String(), blockNum)
-    return h.eventRepo.RedeemPosition(ctx, event.TokenID.Int64(), event.Principal, event.Interest)
+	log.Printf("PositionRedeemed: TokenID=%d Principal=%s Interest=%s Block=%d",
+		event.TokenID.Int64(), event.Principal.String(), event.Interest.String(), blockNum)
+	return h.eventRepo.RedeemPosition(ctx, event.TokenID.Int64(), event.Principal, event.Interest)
 }
 
 /*@
@@ -109,7 +108,7 @@ func (h *PositionHandler) handlePositionRedeemed(ctx context.Context, event *typ
  * @param blockNum Block number where transfer occurred
  */
 func (h *PositionHandler) handlePositionTransfer(ctx context.Context, event *types.PositionTransferEvent, blockNum uint64) error {
-    // Only update if this is a position NFT (not other ERC721 transfers)
-    // Check if token ID exists as position
-    return h.eventRepo.UpdatePositionOwner(ctx, event.TokenID.Int64(), event.To.Hex())
+	// Only update if this is a position NFT (not other ERC721 transfers)
+	// Check if token ID exists as position
+	return h.eventRepo.UpdatePositionOwner(ctx, event.TokenID.Int64(), event.To.Hex())
 }

@@ -3,9 +3,10 @@ package handlers
 
 import (
 	"context"
-	"log"
+	"time"
 
 	"github.com/Revvfi/revvfi-backend/internal/indexer/types"
+	"github.com/Revvfi/revvfi-backend/internal/logger"
 	"github.com/Revvfi/revvfi-backend/internal/repository/postgres"
 )
 
@@ -47,9 +48,23 @@ func (h *BorrowHandler) Handle(ctx context.Context, event interface{}, blockNum 
  * @param blockNum Block number where borrow occurred
  */
 func (h *BorrowHandler) handleBorrow(ctx context.Context, event *types.BorrowEvent, blockNum uint64) error {
+	start := time.Now()
+
+	logger.InfoContext(ctx, "Processing Borrow event",
+		logger.WithEventName("Borrow"),
+		logger.WithBlockNumber(blockNum),
+		logger.WithBorrower(event.Borrower.Hex()),
+		logger.WithAmount(event.Amount.String()),
+		"weighted_apr", event.WeightedAPR,
+	)
+
 	// Update market total debt
-	log.Printf("Borrow: Borrower=%s, Amount=%s, WeightedAPR=%d",
-		event.Borrower.Hex(), event.Amount.String(), event.WeightedAPR)
+	// TODO: Add actual database update logic here
+
+	logger.InfoContext(ctx, "Borrow event processed successfully",
+		logger.WithBorrower(event.Borrower.Hex()),
+		logger.WithDuration(time.Since(start)),
+	)
+
 	return nil
 }
-
