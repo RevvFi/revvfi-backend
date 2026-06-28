@@ -1047,15 +1047,268 @@ func (r *EventRepository) CompleteEpoch(ctx context.Context, epoch *models.Withd
 
 func (r *EventRepository) DecrementOfferRemaining(ctx context.Context, offerID int64, filledAmount *big.Int) error {
     _, err := r.db.conn.ExecContext(ctx, `
-        UPDATE offers 
+        UPDATE offers
         SET remaining_amount = remaining_amount::numeric - $2,
-            status = CASE 
+            status = CASE
                 WHEN remaining_amount::numeric - $2 <= 0 THEN 'filled'
                 ELSE 'partially_filled'
             END,
             updated_at = NOW()
         WHERE offer_id = $1
     `, offerID, filledAmount.String())
-    
+
+    return mapError(err)
+}
+
+// =====================================================
+// MARKET CLOSURE METHODS
+// =====================================================
+
+/*@
+ * CloseMarket
+ * @desc Marks a market as permanently closed from the MarketClosedEvent
+ * @param marketAddress Market contract address
+ * @note A closed market is also set inactive; lending and borrowing halt
+ * @sql UPDATE markets SET is_closed=true, is_active=false, closed_at=NOW()
+ */
+func (r *EventRepository) CloseMarket(ctx context.Context, marketAddress string) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        UPDATE markets
+        SET is_closed = true,
+            is_active = false,
+            closed_at = NOW()
+        WHERE address = $1
+    `, marketAddress)
+    return mapError(err)
+}
+
+// =====================================================
+// POSITION REDEMPTION METHODS
+// =====================================================
+
+/*@
+ * RedeemPosition
+ * @desc Marks a position NFT as redeemed from the PositionRedeemed event
+ * @param tokenID Position NFT token ID
+ * @param principal Principal amount redeemed
+ * @param interest Interest amount redeemed
+ * @note Claimable amount is set to principal + interest; position is deactivated
+ * @sql UPDATE positions SET is_redeemed=true, status='redeemed', redeemed_at=NOW()
+ */
+func (r *EventRepository) RedeemPosition(ctx context.Context, tokenID int64, principal, interest *big.Int) error {
+    totalRedeemed := new(big.Int).Add(principal, interest)
+    _, err := r.db.conn.ExecContext(ctx, `
+        UPDATE positions
+        SET is_redeemed    = true,
+            is_active      = false,
+            status         = 'redeemed',
+            claimable_amount = $2,
+            redeemed_at    = NOW(),
+            last_updated   = NOW()
+        WHERE token_id = $1
+    `, tokenID, totalRedeemed.String())
+    return mapError(err)
+}
+
+// =====================================================
+// COLLATERAL BALANCE METHODS
+// =====================================================
+
+/*@
+ * RecordCollateralDeposit
+ * @desc Upserts collateral balance after a CollateralDeposited event
+ * @param borrower Borrower address
+ * @param amount Amount deposited in this transaction
+ * @param newTotal New authoritative total from the event's Total field
+ * @note Uses the Total field as the authoritative balance; Amount is accumulated
+ * @sql INSERT ... ON CONFLICT (borrower) DO UPDATE SET balance=$newTotal, total_deposited+=amount
+ */
+func (r *EventRepository) RecordCollateralDeposit(ctx context.Context, borrower string, amount, _ *big.Int) error {
+    // CollateralDeposited event only emits amount, not the new total.
+    // Accumulate balance and total_deposited from the amount field.
+    _, err := r.db.conn.ExecContext(ctx, `
+        INSERT INTO collateral_balances (
+            borrower, balance, total_deposited, last_deposit_at, updated_at
+        ) VALUES ($1, $2, $2, NOW(), NOW())
+        ON CONFLICT (borrower) DO UPDATE SET
+            balance         = (collateral_balances.balance::numeric         + $2::numeric)::text,
+            total_deposited = (collateral_balances.total_deposited::numeric + $2::numeric)::text,
+            last_deposit_at = NOW(),
+            updated_at      = NOW()
+    `, borrower, amount.String())
+    return mapError(err)
+}
+
+/*@
+ * RecordCollateralWithdrawal
+ * @desc Upserts collateral balance after a CollateralWithdrawn event
+ * @param borrower Borrower address
+ * @param amount Amount withdrawn in this transaction
+ * @param newTotal New authoritative total from the event's Total field
+ * @note Uses the Total field as the authoritative balance; Amount is accumulated
+ * @sql INSERT ... ON CONFLICT (borrower) DO UPDATE SET balance=$newTotal, total_withdrawn+=amount
+ */
+func (r *EventRepository) RecordCollateralWithdrawal(ctx context.Context, borrower string, amount, _ *big.Int) error {
+    // CollateralWithdrawn event only emits amount, not the new total.
+    // Subtract from accumulated balance; clamp at zero to avoid negative values.
+    _, err := r.db.conn.ExecContext(ctx, `
+        INSERT INTO collateral_balances (
+            borrower, balance, total_withdrawn, last_withdrawal_at, updated_at
+        ) VALUES ($1, '0', $2, NOW(), NOW())
+        ON CONFLICT (borrower) DO UPDATE SET
+            balance         = GREATEST('0', (collateral_balances.balance::numeric - $2::numeric))::text,
+            total_withdrawn = (collateral_balances.total_withdrawn::numeric + $2::numeric)::text,
+            last_withdrawal_at = NOW(),
+            updated_at         = NOW()
+    `, borrower, amount.String())
+    return mapError(err)
+}
+
+// =====================================================
+// CONTROLLER FACTORY METHODS
+// =====================================================
+
+/*@
+ * AddControllerFactory
+ * @desc Inserts a controller factory from ControllerFactoryAdded event
+ * @param address Factory contract address
+ * @param blockNum Block number of the registration event
+ * @note Uses ON CONFLICT to handle re-registration of a previously removed factory
+ * @sql INSERT INTO controller_factories ... ON CONFLICT DO UPDATE (clear removed_at)
+ */
+func (r *EventRepository) AddControllerFactory(ctx context.Context, address string, blockNum uint64) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        INSERT INTO controller_factories (address, added_at, block_number)
+        VALUES ($1, NOW(), $2)
+        ON CONFLICT (address) DO UPDATE SET
+            added_at     = NOW(),
+            removed_at   = NULL,
+            block_number = $2
+    `, address, int64(blockNum))
+    return mapError(err)
+}
+
+/*@
+ * RemoveControllerFactory
+ * @desc Sets removed_at on a controller factory from ControllerFactoryRemoved event
+ * @param address Factory contract address
+ * @sql UPDATE controller_factories SET removed_at=NOW() WHERE address=$1
+ */
+func (r *EventRepository) RemoveControllerFactory(ctx context.Context, address string) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        UPDATE controller_factories
+        SET removed_at = NOW()
+        WHERE address = $1
+    `, address)
+    return mapError(err)
+}
+
+// =====================================================
+// CONTROLLER METHODS
+// =====================================================
+
+/*@
+ * AddController
+ * @desc Inserts a controller from ControllerAdded event
+ * @param address Controller contract address (from event's ControllerFactory field)
+ * @param blockNum Block number of the registration event
+ * @note Uses ON CONFLICT to handle re-registration of a previously removed controller
+ * @sql INSERT INTO controllers ... ON CONFLICT DO UPDATE (clear removed_at)
+ */
+func (r *EventRepository) AddController(ctx context.Context, address string, blockNum uint64) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        INSERT INTO controllers (address, added_at, block_number)
+        VALUES ($1, NOW(), $2)
+        ON CONFLICT (address) DO UPDATE SET
+            added_at     = NOW(),
+            removed_at   = NULL,
+            block_number = $2
+    `, address, int64(blockNum))
+    return mapError(err)
+}
+
+/*@
+ * RemoveController
+ * @desc Sets removed_at on a controller from ControllerRemoved event
+ * @param address Controller contract address
+ * @sql UPDATE controllers SET removed_at=NOW() WHERE address=$1
+ */
+func (r *EventRepository) RemoveController(ctx context.Context, address string) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        UPDATE controllers
+        SET removed_at = NOW()
+        WHERE address = $1
+    `, address)
+    return mapError(err)
+}
+
+// =====================================================
+// BORROWER ACTIVITY METHODS
+// =====================================================
+
+/*@
+ * IncrementBorrowerTotalBorrowed
+ * @desc Increments total_borrowed and active_loans from BorrowActivityRecorded event
+ * @param borrowerAddress Borrower wallet address
+ * @param amount Amount borrowed in this activity event
+ * @sql UPDATE borrowers SET total_borrowed+=amount, active_loans+=1, total_loans+=1
+ */
+func (r *EventRepository) IncrementBorrowerTotalBorrowed(ctx context.Context, borrowerAddress string, amount *big.Int) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        UPDATE borrowers
+        SET total_borrowed = (total_borrowed::numeric + $2)::text,
+            active_loans   = active_loans + 1,
+            total_loans    = total_loans + 1,
+            last_activity  = NOW()
+        WHERE address = $1
+    `, borrowerAddress, amount.String())
+    return mapError(err)
+}
+
+/*@
+ * IncrementBorrowerDefaults
+ * @desc Increments defaulted_loans and reduces reputation score from DefaultRecorded event
+ * @param borrowerAddress Borrower wallet address
+ * @note Each default reduces reputation by 50 points (floor 0) and updates risk_label.
+ *       active_loans is decremented to reflect the closed (defaulted) loan.
+ * @sql UPDATE borrowers SET defaulted_loans+=1, reputation_score=GREATEST(score-50,0)
+ */
+func (r *EventRepository) IncrementBorrowerDefaults(ctx context.Context, borrowerAddress string) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        UPDATE borrowers
+        SET defaulted_loans  = defaulted_loans + 1,
+            active_loans     = GREATEST(active_loans - 1, 0),
+            reputation_score = GREATEST(reputation_score - 50, 0),
+            risk_label       = CASE
+                WHEN GREATEST(reputation_score - 50, 0) >= 900 THEN 'AAA'
+                WHEN GREATEST(reputation_score - 50, 0) >= 800 THEN 'AA'
+                WHEN GREATEST(reputation_score - 50, 0) >= 700 THEN 'A'
+                WHEN GREATEST(reputation_score - 50, 0) >= 500 THEN 'B'
+                WHEN GREATEST(reputation_score - 50, 0) >= 300 THEN 'C'
+                ELSE 'D'
+            END,
+            last_activity = NOW()
+        WHERE address = $1
+    `, borrowerAddress)
+    return mapError(err)
+}
+
+/*@
+ * RecordSuccessfulRepayment
+ * @desc Increments successful_loans and total_repaid from SuccessfulRepaymentRecorded event
+ * @param borrowerAddress Borrower wallet address
+ * @param amount Amount repaid in this event
+ * @note active_loans is decremented to reflect the closed (successfully repaid) loan.
+ * @sql UPDATE borrowers SET successful_loans+=1, total_repaid+=amount, active_loans=MAX(0,n-1)
+ */
+func (r *EventRepository) RecordSuccessfulRepayment(ctx context.Context, borrowerAddress string, amount *big.Int) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        UPDATE borrowers
+        SET successful_loans = successful_loans + 1,
+            active_loans     = GREATEST(active_loans - 1, 0),
+            total_repaid     = (total_repaid::numeric + $2)::text,
+            last_activity    = NOW()
+        WHERE address = $1
+    `, borrowerAddress, amount.String())
     return mapError(err)
 }

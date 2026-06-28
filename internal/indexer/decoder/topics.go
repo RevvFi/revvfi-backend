@@ -77,6 +77,15 @@ var EventTopics = map[string]string{
 	"SuccessfulRepaymentRecorded": "0x5fa8b5b1d0e8a192bd39abc8b925749c1715d8b23930736831a92ba18e840fa8",
 
 	// ============================================
+	// COLLATERAL ESCROW EVENTS (RevvFiCollateralEscrow - 5 events)
+	// ============================================
+	"CollateralDeposited":         "0xd7243f6f8212d5188fd054141cf6ea89cfc0d91facb8c3afe2f88a1358480142",
+	"CollateralWithdrawn":         "0xc30fcfbcaac9e0deffa719714eaa82396ff506a0d0d0eebe170830177288715d",
+	"CollateralLiquidated":        "0x4f65008ff243a1aab5777a6563d91c319b667f92b3f74af652fc9cd4f247d20b",
+	"MinCollateralRatioUpdated":    "0x948ba262e91565b9caa2284557ddf9a7fb36ee3f00681b4fd1bfaae941e9188f",
+	"LiquidationThresholdUpdated": "0xcdadd717dc9ee3550a289071d1af75e229726888d51e3a31c9e3dfc693d4852b",
+
+	// ============================================
 	// ARCH CONTROLLER EVENTS (RevvFiArchController - 11 events)
 	// ============================================
 	"AssetBlacklisted":        "0x10c0fc3aa3fe3ed617ce4c1f51f37e0203828eeab656b100bfb44b569779d638",

@@ -24,7 +24,7 @@ func TestEventRepositoryIdempotency(t *testing.T) {
 	repo := NewEventRepository(Wrap(conn))
 	ctx := context.Background()
 
-	mock.ExpectQuery("select exists").WithArgs("0xabc", int32(3)).WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+	mock.ExpectQuery("(?i)select exists").WithArgs("0xabc", 3).WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 	processed, err := repo.IsProcessed(ctx, "0xabc", 3)
 	if err != nil {
 		t.Fatalf("check processed: %v", err)
@@ -33,7 +33,7 @@ func TestEventRepositoryIdempotency(t *testing.T) {
 		t.Fatal("expected event to be unprocessed")
 	}
 
-	mock.ExpectExec("insert into processed_events").WithArgs("0xabc", int32(3), int64(10), "OfferSubmitted", "0xMarket", sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec("(?i)insert into processed_events").WithArgs("0xabc", int32(3), int64(10), "OfferSubmitted", "0xMarket", sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
 	if err := repo.MarkProcessed(ctx, &models.ProcessedEvent{TxHash: "0xabc", LogIndex: 3, BlockNumber: 10, EventName: "OfferSubmitted", ContractAddress: "0xMarket"}); err != nil {
 		t.Fatalf("mark processed: %v", err)
 	}

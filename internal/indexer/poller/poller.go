@@ -6,52 +6,40 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 
+	"github.com/Revvfi/revvfi-backend/internal/indexer/registry"
 	"github.com/Revvfi/revvfi-backend/internal/indexer/settings"
 	"github.com/Revvfi/revvfi-backend/internal/repository/postgres"
 )
 
 type BlockPoller struct {
-	ethClient      *ethclient.Client
-	checkpointRepo *postgres.CheckpointRepository
-	config         *settings.Config
+	ethClient        *ethclient.Client
+	checkpointRepo   *postgres.CheckpointRepository
+	config           *settings.Config
+	contractRegistry *registry.ContractRegistry
 }
 
 func NewBlockPoller(
 	ethClient *ethclient.Client,
 	checkpointRepo *postgres.CheckpointRepository,
 	config *settings.Config,
+	contractRegistry *registry.ContractRegistry,
 ) *BlockPoller {
 	return &BlockPoller{
-		ethClient:      ethClient,
-		checkpointRepo: checkpointRepo,
-		config:         config,
+		ethClient:        ethClient,
+		checkpointRepo:   checkpointRepo,
+		config:           config,
+		contractRegistry: contractRegistry,
 	}
 }
 
 func (p *BlockPoller) FetchLogs(ctx context.Context, fromBlock, toBlock uint64) ([]types.Log, error) {
-	// Define contract addresses to monitor
-	addresses := []common.Address{
-		common.HexToAddress(p.config.FactoryAddress),
-		common.HexToAddress(p.config.LiquidatorAddress),
-		common.HexToAddress(p.config.PositionNFTAddress),
-		common.HexToAddress(p.config.MarketAddress),        // ← ADD
-        common.HexToAddress(p.config.OfferBookAddress),     // ← ADD
-	}
- // Debug logging
-    log.Printf(" Monitoring %d contract addresses", len(addresses))
-    for _, addr := range addresses {
-        log.Printf("   - %s", addr.Hex())
-    }
-	if p.config.ArchControllerAddress != "" {
-		addresses = append(addresses, common.HexToAddress(p.config.ArchControllerAddress))
-	}
-	if p.config.ReputationRegistryAddress != "" {
-		addresses = append(addresses, common.HexToAddress(p.config.ReputationRegistryAddress))
-	}
+	// Get dynamic list of addresses from contract registry
+	addresses := p.contractRegistry.GetAddresses()
+
+	log.Printf("Fetching logs from %d to %d (addresses=%d)", fromBlock, toBlock, len(addresses))
 
 	query := ethereum.FilterQuery{
 		FromBlock: new(big.Int).SetUint64(fromBlock),
@@ -59,8 +47,6 @@ func (p *BlockPoller) FetchLogs(ctx context.Context, fromBlock, toBlock uint64) 
 		Addresses: addresses,
 	}
 
-	// Diagnostic: log the filter being used
-	log.Printf("Fetching logs from %d to %d (addresses=%d)", fromBlock, toBlock, len(addresses))
 	logs, err := p.ethClient.FilterLogs(ctx, query)
 	if err != nil {
 		return nil, err

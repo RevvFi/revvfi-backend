@@ -233,15 +233,25 @@ func (d *EventDecoder) Decode(log goEthtypes.Log) (interface{}, error) {
     case "InterestAccrued":
         return d.decodeInterestAccrued(log)
     case "CollateralDeposited":
-        return d.decodeCollateralDeposited(log)           
+        return d.decodeCollateralDeposited(log)
     case "CollateralWithdrawn":
-        return d.decodeCollateralWithdrawn(log)           
+        return d.decodeCollateralWithdrawn(log)
+    case "CollateralLiquidated":
+        return d.decodeCollateralLiquidated(log)
+    case "MinCollateralRatioUpdated":
+        return d.decodeMinCollateralRatioUpdated(log)
+    case "LiquidationThresholdUpdated":
+        return d.decodeLiquidationThresholdUpdated(log)
     case "MarketPaused":
         return d.decodeMarketPaused(log)
     case "MarketUnpaused":
         return d.decodeMarketUnpaused(log)
     case "LiquidationExecuted":
         return d.decodeLiquidationExecuted(log)
+    case "LiquidationStartedMarket":
+        return d.decodeLiquidationStartedMarket(log)
+    case "LiquidationEndedMarket":
+        return d.decodeLiquidationEndedMarket(log)
     case "MarketClosedEvent":
         return d.decodeMarketClosedEvent(log)
 
@@ -645,13 +655,14 @@ func (d *EventDecoder) decodeOfferSubmitted(log goEthtypes.Log) (*indexertypes.O
         return nil, fmt.Errorf("OfferSubmitted: insufficient data length")
     }
     
+    // data layout: [amount(32)][apr(32)][seniority(32, right-aligned uint8)][expiry(32)]
     event.Amount = new(big.Int).SetBytes(log.Data[0:32])
     event.APR = new(big.Int).SetBytes(log.Data[32:64])
-    event.Seniority = log.Data[64] // uint8
+    event.Seniority = log.Data[95] // uint8 is right-aligned in 32-byte ABI slot
     event.Expiry = new(big.Int).SetBytes(log.Data[96:128])
-    event.Market = common.BytesToAddress(log.Data[96:128])  // ← Market from data, not topics
+    // Market is not in OfferSubmitted event; use the emitting contract address as a proxy
+    event.Market = log.Address
 
-    
     return event, nil
 }
 
@@ -844,11 +855,12 @@ func (d *EventDecoder) decodeAuctionCreated(log goEthtypes.Log) (*indexertypes.A
         return nil, fmt.Errorf("AuctionCreated: insufficient data length")
     }
     
-    event.CollateralAmount = new(big.Int).SetBytes(log.Data[0:32])
-    event.DebtAmount = new(big.Int).SetBytes(log.Data[32:64])
-    event.StartTime = new(big.Int).SetBytes(log.Data[64:96])
-    event.EndTime = new(big.Int).SetBytes(log.Data[128:160])
-    
+    // data layout: [borrowAsset(skip)][collateralAsset(skip)][collateralAmount][debtAmount][startTime][endTime]
+    event.CollateralAmount = new(big.Int).SetBytes(log.Data[64:96])
+    event.DebtAmount = new(big.Int).SetBytes(log.Data[96:128])
+    event.StartTime = new(big.Int).SetBytes(log.Data[128:160])
+    event.EndTime = new(big.Int).SetBytes(log.Data[160:192])
+
     return event, nil
 }
 
@@ -889,14 +901,18 @@ func (d *EventDecoder) decodeAuctionSettled(log goEthtypes.Log) (*indexertypes.A
     event.AuctionID = new(big.Int).SetBytes(log.Topics[1].Bytes())
     event.Winner = common.HexToAddress(log.Topics[2].Hex())
     
-    if len(log.Data) < 96 {
-        return nil, fmt.Errorf("AuctionSettled: insufficient data length")
+    // event: AuctionSettled(uint256 indexed auctionId, address indexed winner,
+    //        address collateralAsset, uint256 collateralAmount, uint256 bidAmount, uint256 debtRepaid)
+    // data layout (128 bytes): [collateralAsset(skip)][collateralAmount][bidAmount][debtRepaid]
+    if len(log.Data) < 128 {
+        return nil, fmt.Errorf("AuctionSettled: insufficient data length, got %d", len(log.Data))
     }
-    
-    event.WinningBid = new(big.Int).SetBytes(log.Data[0:32])
-    event.CollateralTransferred = new(big.Int).SetBytes(log.Data[32:64])
-    event.RecoveryRate = new(big.Int).SetBytes(log.Data[64:96])
-    
+
+    // data[0:32] = collateralAsset address — skip
+    event.CollateralTransferred = new(big.Int).SetBytes(log.Data[32:64]) // collateralAmount
+    event.WinningBid = new(big.Int).SetBytes(log.Data[64:96])            // bidAmount
+    event.RecoveryRate = new(big.Int).SetBytes(log.Data[96:128])         // debtRepaid
+
     return event, nil
 }
 
@@ -1769,6 +1785,88 @@ func (d *EventDecoder) decodeBorrowActivityRecorded(log goEthtypes.Log) (*indexe
     }
 
     event.Amount = new(big.Int).SetBytes(log.Data[0:32])
+
+    return event, nil
+}
+
+// =====================================================
+// COLLATERAL ESCROW ADDITIONAL DECODERS
+// =====================================================
+
+// decodeCollateralLiquidated decodes CollateralLiquidated(address indexed borrower, uint256 collateralAmount, uint256 debtAmount)
+func (d *EventDecoder) decodeCollateralLiquidated(log goEthtypes.Log) (*indexertypes.CollateralLiquidatedEvent, error) {
+    event := &indexertypes.CollateralLiquidatedEvent{}
+
+    if len(log.Topics) < 2 {
+        return nil, fmt.Errorf("CollateralLiquidated: expected at least 2 topics, got %d", len(log.Topics))
+    }
+
+    event.Borrower = common.HexToAddress(log.Topics[1].Hex())
+
+    if len(log.Data) < 64 {
+        return nil, fmt.Errorf("CollateralLiquidated: insufficient data length, need 64 bytes, got %d", len(log.Data))
+    }
+
+    event.Amount = new(big.Int).SetBytes(log.Data[0:32])   // collateralAmount
+    event.Proceeds = new(big.Int).SetBytes(log.Data[32:64]) // debtAmount
+
+    return event, nil
+}
+
+// =====================================================
+// MARKET LIQUIDATION STATE DECODERS
+// =====================================================
+
+// decodeLiquidationStartedMarket decodes LiquidationStartedMarket(address indexed borrower)
+func (d *EventDecoder) decodeLiquidationStartedMarket(log goEthtypes.Log) (*indexertypes.LiquidationStartedMarketEvent, error) {
+    event := &indexertypes.LiquidationStartedMarketEvent{}
+
+    if len(log.Topics) < 2 {
+        return nil, fmt.Errorf("LiquidationStartedMarket: expected at least 2 topics, got %d", len(log.Topics))
+    }
+
+    event.Borrower = common.HexToAddress(log.Topics[1].Hex())
+
+    return event, nil
+}
+
+// decodeLiquidationEndedMarket decodes LiquidationEndedMarket(address indexed borrower)
+func (d *EventDecoder) decodeLiquidationEndedMarket(log goEthtypes.Log) (*indexertypes.LiquidationEndedMarketEvent, error) {
+    event := &indexertypes.LiquidationEndedMarketEvent{}
+
+    if len(log.Topics) < 2 {
+        return nil, fmt.Errorf("LiquidationEndedMarket: expected at least 2 topics, got %d", len(log.Topics))
+    }
+
+    event.Borrower = common.HexToAddress(log.Topics[1].Hex())
+
+    return event, nil
+}
+
+// decodeMinCollateralRatioUpdated decodes MinCollateralRatioUpdated(uint256 oldRatio, uint256 newRatio)
+func (d *EventDecoder) decodeMinCollateralRatioUpdated(log goEthtypes.Log) (*indexertypes.MinCollateralRatioUpdatedEvent, error) {
+    event := &indexertypes.MinCollateralRatioUpdatedEvent{}
+
+    if len(log.Data) < 64 {
+        return nil, fmt.Errorf("MinCollateralRatioUpdated: insufficient data, got %d bytes", len(log.Data))
+    }
+
+    event.OldRatio = new(big.Int).SetBytes(log.Data[0:32])
+    event.NewRatio = new(big.Int).SetBytes(log.Data[32:64])
+
+    return event, nil
+}
+
+// decodeLiquidationThresholdUpdated decodes LiquidationThresholdUpdated(uint256 oldThreshold, uint256 newThreshold)
+func (d *EventDecoder) decodeLiquidationThresholdUpdated(log goEthtypes.Log) (*indexertypes.LiquidationThresholdUpdatedEvent, error) {
+    event := &indexertypes.LiquidationThresholdUpdatedEvent{}
+
+    if len(log.Data) < 64 {
+        return nil, fmt.Errorf("LiquidationThresholdUpdated: insufficient data, got %d bytes", len(log.Data))
+    }
+
+    event.OldThreshold = new(big.Int).SetBytes(log.Data[0:32])
+    event.NewThreshold = new(big.Int).SetBytes(log.Data[32:64])
 
     return event, nil
 }

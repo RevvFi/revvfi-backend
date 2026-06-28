@@ -109,3 +109,13 @@ type DrawdownExecutedEvent struct {
     WeightedAPR  *big.Int
     PositionIds  []*big.Int
 }
+
+// LiquidationStartedMarket is emitted by RevvFiMarket when liquidation begins
+type LiquidationStartedMarketEvent struct {
+    Borrower common.Address
+}
+
+// LiquidationEndedMarket is emitted by RevvFiMarket when liquidation completes
+type LiquidationEndedMarketEvent struct {
+    Borrower common.Address
+}
