@@ -140,7 +140,9 @@ type BlockchainConfig struct {
 	ReputationRegistryAddress string
 	MarketAddress             string
 	OfferBookAddress          string
-	StartBlock                uint64  // ← ADD THIS
+	CollateralEscrowAddress   string
+	StartBlock                uint64
+	AdminWallets              []string
 }
 
 /*
@@ -215,7 +217,7 @@ func Load() (*Config, error) {
 		CORS: CORSConfig{
 			AllowedOrigins: splitEnv("CORS_ALLOWED_ORIGINS", []string{"http://localhost:3000", "http://localhost:3001"}),
 			AllowedMethods: splitEnv("CORS_ALLOWED_METHODS", []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}),
-			AllowedHeaders: splitEnv("CORS_ALLOWED_HEADERS", []string{"Authorization", "Content-Type", "X-Requested-With"}),
+			AllowedHeaders: splitEnv("CORS_ALLOWED_HEADERS", []string{"Authorization", "Content-Type", "X-Requested-With", "X-Correlation-ID"}),
 		},
 		RateLimit: RateLimitConfig{
 			Requests: getIntEnv("RATE_LIMIT_REQUESTS", 120),
@@ -231,8 +233,10 @@ func Load() (*Config, error) {
 			PositionNFTAddress:        getEnv("POSITION_NFT_ADDRESS", ""),
 			LiquidatorAddress:         getEnv("LIQUIDATOR_ADDRESS", ""),
 			ReputationRegistryAddress: getEnv("REPUTATION_REGISTRY_ADDRESS", ""),
-			  MarketAddress:             getEnv("MARKET_ADDRESS", ""),        
-              OfferBookAddress:          getEnv("OFFERBOOK_ADDRESS", ""),        
+			MarketAddress:             getEnv("MARKET_ADDRESS", ""),
+			OfferBookAddress:          getEnv("OFFERBOOK_ADDRESS", ""),
+			CollateralEscrowAddress:   getEnv("COLLATERAL_ESCROW_ADDRESS", ""),
+			AdminWallets:              splitEnv("ADMIN_WALLETS", []string{}),
 		},
 		Auth: AuthConfig{ 
 			Domain:     getEnv("AUTH_DOMAIN", "revvfi.com"),
