@@ -207,10 +207,10 @@ Maps an auction domain model to API response DTO.
 @returns
 - response.AuctionResponse
 */
-func auctionResponse(auction *models.Auction) response.AuctionResponse {
+func auctionResponse(auction *models.Auction, market *models.Market) response.AuctionResponse {
 	remaining := max(time.Until(auction.EndTime), 0)
 
-	return response.AuctionResponse{
+	resp := response.AuctionResponse{
 		AuctionID:        auction.AuctionID,
 		MarketAddress:    auction.MarketAddress,
 		Borrower:         auction.BorrowerAddress,
@@ -224,6 +224,22 @@ func auctionResponse(auction *models.Auction) response.AuctionResponse {
 		StartTime:        auction.StartTime.Unix(),
 		EndTime:          auction.EndTime.Unix(),
 	}
+
+	// Add asset info if market is provided
+	if market != nil {
+		resp.BorrowAsset = &response.AssetInfo{
+			Address:  market.BorrowAsset,
+			Symbol:   market.BorrowAssetSymbol.String,
+			Decimals: int(market.BorrowAssetDecimals),
+		}
+		resp.CollateralAsset = &response.AssetInfo{
+			Address:  market.CollateralAsset,
+			Symbol:   market.CollateralAssetSymbol.String,
+			Decimals: int(market.CollateralAssetDecimals),
+		}
+	}
+
+	return resp
 }
 
 /*

@@ -129,6 +129,7 @@ Handles readiness checks for deployment probes.
 - c: Gin context
 */
 func (h *HealthHandler) Ready(c *gin.Context) {
+	ctx := c.Request.Context()
 	if h.db == nil {
 		ok(c, http.StatusOK, response.ReadinessResponse{Ready: true})
 		return
