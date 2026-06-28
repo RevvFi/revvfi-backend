@@ -2,13 +2,13 @@
 package handlers
 
 import (
-    "context"
+	"context"
 
-    "time"
+	"time"
 
-    "github.com/Revvfi/revvfi-backend/internal/indexer/types"
-    "github.com/Revvfi/revvfi-backend/internal/models"
-    "github.com/Revvfi/revvfi-backend/internal/repository/postgres"
+	"github.com/Revvfi/revvfi-backend/internal/indexer/types"
+	"github.com/Revvfi/revvfi-backend/internal/models"
+	"github.com/Revvfi/revvfi-backend/internal/repository/postgres"
 )
 
 /*@
@@ -27,7 +27,7 @@ import (
  *   AuctionCancelled → cancelled (retry or permanent failure)
  */
 type AuctionHandler struct {
-    eventRepo *postgres.EventRepository
+	eventRepo *postgres.EventRepository
 }
 
 /*@
@@ -37,7 +37,7 @@ type AuctionHandler struct {
  * @returns Configured AuctionHandler
  */
 func NewAuctionHandler(eventRepo *postgres.EventRepository) *AuctionHandler {
-    return &AuctionHandler{eventRepo: eventRepo}
+	return &AuctionHandler{eventRepo: eventRepo}
 }
 
 /*@
@@ -49,17 +49,17 @@ func NewAuctionHandler(eventRepo *postgres.EventRepository) *AuctionHandler {
  * @returns error if handling fails
  */
 func (h *AuctionHandler) Handle(ctx context.Context, event interface{}, blockNum uint64) error {
-    switch e := event.(type) {
-    case *types.AuctionCreatedEvent:
-        return h.handleAuctionCreated(ctx, e)
-    case *types.BidPlacedEvent:
-        return h.handleBidPlaced(ctx, e)
-    case *types.AuctionSettledEvent:
-        return h.handleAuctionSettled(ctx, e)
-    case *types.AuctionCancelledEvent:
-        return h.handleAuctionCancelled(ctx, e)
-    }
-    return nil
+	switch e := event.(type) {
+	case *types.AuctionCreatedEvent:
+		return h.handleAuctionCreated(ctx, e)
+	case *types.BidPlacedEvent:
+		return h.handleBidPlaced(ctx, e)
+	case *types.AuctionSettledEvent:
+		return h.handleAuctionSettled(ctx, e)
+	case *types.AuctionCancelledEvent:
+		return h.handleAuctionCancelled(ctx, e)
+	}
+	return nil
 }
 
 /*@
@@ -75,21 +75,21 @@ func (h *AuctionHandler) Handle(ctx context.Context, event interface{}, blockNum
  *   - HighestBidder = nil
  */
 func (h *AuctionHandler) handleAuctionCreated(ctx context.Context, event *types.AuctionCreatedEvent) error {
-    auction := &models.Auction{
-        AuctionID:        event.AuctionID.Int64(),
-        MarketAddress:    event.Market.Hex(),
-        BorrowerAddress:  event.Borrower.Hex(),
-        CollateralAmount: event.CollateralAmount,
-        DebtAmount:       event.DebtAmount,
-        CurrentPrice:     event.DebtAmount, // Initial price = debt amount
-        StartTime:        time.Unix(event.StartTime.Int64(), 0),
-        EndTime:          time.Unix(event.EndTime.Int64(), 0),
-        Status:           "active",
-        CreatedAt:        time.Now(),
-        UpdatedAt:        time.Now(),
-    }
-    
-    return h.eventRepo.SaveAuction(ctx, auction)
+	auction := &models.Auction{
+		AuctionID:        event.AuctionID.Int64(),
+		MarketAddress:    event.Market.Hex(),
+		BorrowerAddress:  event.Borrower.Hex(),
+		CollateralAmount: event.CollateralAmount,
+		DebtAmount:       event.DebtAmount,
+		CurrentPrice:     event.DebtAmount, // Initial price = debt amount
+		StartTime:        time.Unix(event.StartTime.Int64(), 0),
+		EndTime:          time.Unix(event.EndTime.Int64(), 0),
+		Status:           "active",
+		CreatedAt:        time.Now(),
+		UpdatedAt:        time.Now(),
+	}
+
+	return h.eventRepo.SaveAuction(ctx, auction)
 }
 
 /*@
@@ -104,8 +104,9 @@ func (h *AuctionHandler) handleAuctionCreated(ctx context.Context, event *types.
  *   - Previous highest bidder is refunded
  */
 func (h *AuctionHandler) handleBidPlaced(ctx context.Context, event *types.BidPlacedEvent) error {
-    return h.eventRepo.UpdateAuctionBid(ctx, event.AuctionID.Int64(), event.BidAmount, event.Bidder.Hex())
+	return h.eventRepo.UpdateAuctionBid(ctx, event.AuctionID.Int64(), event.BidAmount, event.Bidder.Hex())
 }
+
 /*@
  * handleAuctionSettled
  * @desc Marks auction as settled with winner info
@@ -122,27 +123,26 @@ func (h *AuctionHandler) handleBidPlaced(ctx context.Context, event *types.BidPl
  *       No off-chain calculation needed - trust the contract's math
  */
 func (h *AuctionHandler) handleAuctionSettled(ctx context.Context, event *types.AuctionSettledEvent) error {
-    // RecoveryRate is provided directly by the contract
-    // The contract calculates: (winningBid * 10000) / debtAmount
-    // Returned as basis points (1% = 100 bps, 100% = 10000 bps)
-    var recoveryRatePercent float64
-    
-    if event.RecoveryRate != nil {
-        // Convert from basis points to percentage
-        // Example: 8500 basis points = 85.00%
-        recoveryRatePercent = float64(event.RecoveryRate.Int64()) / 100
-    }
-    
-    // Store the auction settlement with the recovery rate
-    // The winning bid and winner are also recorded for transparency
-    return h.eventRepo.SettleAuction(ctx, 
-        event.AuctionID.Int64(), 
-        event.Winner.Hex(), 
-        event.WinningBid, 
-        recoveryRatePercent,
-    )
-}
+	// RecoveryRate is provided directly by the contract
+	// The contract calculates: (winningBid * 10000) / debtAmount
+	// Returned as basis points (1% = 100 bps, 100% = 10000 bps)
+	var recoveryRatePercent float64
 
+	if event.RecoveryRate != nil {
+		// Convert from basis points to percentage
+		// Example: 8500 basis points = 85.00%
+		recoveryRatePercent = float64(event.RecoveryRate.Int64()) / 100
+	}
+
+	// Store the auction settlement with the recovery rate
+	// The winning bid and winner are also recorded for transparency
+	return h.eventRepo.SettleAuction(ctx,
+		event.AuctionID.Int64(),
+		event.Winner.Hex(),
+		event.WinningBid,
+		recoveryRatePercent,
+	)
+}
 
 /*@
  * handleAuctionCancelled
@@ -159,5 +159,5 @@ func (h *AuctionHandler) handleAuctionSettled(ctx context.Context, event *types.
  *       when no bids are received during the auction period.
  */
 func (h *AuctionHandler) handleAuctionCancelled(ctx context.Context, event *types.AuctionCancelledEvent) error {
-    return h.eventRepo.UpdateAuctionStatus(ctx, event.AuctionID.Int64(), "cancelled")
+	return h.eventRepo.UpdateAuctionStatus(ctx, event.AuctionID.Int64(), "cancelled")
 }

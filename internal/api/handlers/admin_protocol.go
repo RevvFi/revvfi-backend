@@ -249,9 +249,9 @@ func (h *AdminProtocolHandler) ListPendingUpgrades(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"upgrades":       upgrades,
-			"pagination":     pagination,
-			"total_pending":  totalPending,
+			"upgrades":      upgrades,
+			"pagination":    pagination,
+			"total_pending": totalPending,
 		},
 	})
 }

@@ -42,9 +42,9 @@ Tests all CRUD operations, error handling, and response mapping.
 Mock implementation of MarketService interface for testing.
 */
 type mockMarketService struct {
-	createMarketFn  func(ctx context.Context, address string, borrower, borrowAsset, collateralAsset, collateralOracle string, minRatio, liquidationThreshold int32) (*models.Market, error)
-	getMarketFn     func(ctx context.Context, address string) (*models.Market, error)
-	listMarketsFn   func(ctx context.Context, limit, offset int32) ([]models.Market, error)
+	createMarketFn     func(ctx context.Context, address string, borrower, borrowAsset, collateralAsset, collateralOracle string, minRatio, liquidationThreshold int32) (*models.Market, error)
+	getMarketFn        func(ctx context.Context, address string) (*models.Market, error)
+	listMarketsFn      func(ctx context.Context, limit, offset int32) ([]models.Market, error)
 	calculateMetricsFn func(ctx context.Context, market *models.Market) (map[string]interface{}, error)
 }
 
@@ -137,31 +137,31 @@ Test successful market creation with valid parameters.
 */
 func TestCreateMarket_Success(t *testing.T) {
 	/*
-	@logic Setup
-	@desc Initialize mock service and handler.
+		@logic Setup
+		@desc Initialize mock service and handler.
 	*/
 	mockSvc := &mockMarketService{
 		createMarketFn: func(ctx context.Context, address string, borrower, borrowAsset, collateralAsset, collateralOracle string, minRatio, liquidationThreshold int32) (*models.Market, error) {
 			return &models.Market{
-				ID:                      1,
-				Address:                 address,
-				Borrower:                borrower,
-				BorrowAsset:             borrowAsset,
-				CollateralAsset:         collateralAsset,
-				CollateralOracle:        collateralOracle,
-				MinCollateralRatio:      minRatio,
-				LiquidationThreshold:    liquidationThreshold,
-				TotalPrincipal:          big.NewInt(0),
-				TotalAccruedInterest:    big.NewInt(0),
-				TotalDebt:               big.NewInt(0),
-				TotalLiquidity:          big.NewInt(0),
-				WeightedAvgAPR:          500,
-				UtilizationRate:         0.0,
-				IsActive:                true,
-				IsLiquidating:           false,
-				IsClosed:                false,
-				CreatedAt:               time.Now(),
-				LastInterestAccrual:     time.Now(),
+				ID:                   1,
+				Address:              address,
+				Borrower:             borrower,
+				BorrowAsset:          borrowAsset,
+				CollateralAsset:      collateralAsset,
+				CollateralOracle:     collateralOracle,
+				MinCollateralRatio:   minRatio,
+				LiquidationThreshold: liquidationThreshold,
+				TotalPrincipal:       big.NewInt(0),
+				TotalAccruedInterest: big.NewInt(0),
+				TotalDebt:            big.NewInt(0),
+				TotalLiquidity:       big.NewInt(0),
+				WeightedAvgAPR:       500,
+				UtilizationRate:      0.0,
+				IsActive:             true,
+				IsLiquidating:        false,
+				IsClosed:             false,
+				CreatedAt:            time.Now(),
+				LastInterestAccrual:  time.Now(),
 			}, nil
 		},
 	}
@@ -178,8 +178,8 @@ func TestCreateMarket_Success(t *testing.T) {
 	}
 
 	/*
-	@logic BuildRequest
-	@desc Create valid CreateMarketRequest payload.
+		@logic BuildRequest
+		@desc Create valid CreateMarketRequest payload.
 	*/
 	req := request.CreateMarketRequest{
 		BorrowAsset:             "0x6b175474e89094c44da98b954eedeac495271d0f",
@@ -195,8 +195,8 @@ func TestCreateMarket_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	/*
-	@logic CreateContext
-	@desc Create Gin test context with wallet_address set.
+		@logic CreateContext
+		@desc Create Gin test context with wallet_address set.
 	*/
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
@@ -206,14 +206,14 @@ func TestCreateMarket_Success(t *testing.T) {
 	c.Set("wallet_address", "0x1234567890123456789012345678901234567890")
 
 	/*
-	@logic ExecuteHandler
-	@desc Call handler with mocked context.
+		@logic ExecuteHandler
+		@desc Call handler with mocked context.
 	*/
 	handler.CreateMarket(c)
 
 	/*
-	@logic AssertResponse
-	@desc Verify status code and response structure.
+		@logic AssertResponse
+		@desc Verify status code and response structure.
 	*/
 	assert.Equal(t, http.StatusCreated, w.Code)
 
@@ -225,8 +225,8 @@ func TestCreateMarket_Success(t *testing.T) {
 	assert.NotNil(t, respBody["data"])
 
 	/*
-	@logic AssertData
-	@desc Verify market data in response.
+		@logic AssertData
+		@desc Verify market data in response.
 	*/
 	data := respBody["data"].(map[string]interface{})
 	assert.Equal(t, "0x1234567890123456789012345678901234567890", data["borrower"])
@@ -248,8 +248,8 @@ The wallet check happens BEFORE JSON parsing, so we need valid JSON.
 */
 func TestCreateMarket_MissingWallet(t *testing.T) {
 	/*
-	@logic Setup
-	@desc Create handler without wallet in context.
+		@logic Setup
+		@desc Create handler without wallet in context.
 	*/
 	handler := &AdminHandler{
 		marketService:   &mockMarketService{},
@@ -276,14 +276,14 @@ func TestCreateMarket_MissingWallet(t *testing.T) {
 	// No wallet_address in context
 
 	/*
-	@logic ExecuteHandler
-	@desc Call handler without wallet.
+		@logic ExecuteHandler
+		@desc Call handler without wallet.
 	*/
 	handler.CreateMarket(c)
 
 	/*
-	@logic AssertError
-	@desc Verify 401 response.
+		@logic AssertError
+		@desc Verify 401 response.
 	*/
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 
@@ -304,7 +304,7 @@ Test market creation with malformed JSON.
 */
 func TestCreateMarket_InvalidRequest(t *testing.T) {
 	/*
-	@logic Setup
+		@logic Setup
 	*/
 	handler := &AdminHandler{
 		marketService:   &mockMarketService{},
@@ -319,14 +319,14 @@ func TestCreateMarket_InvalidRequest(t *testing.T) {
 	c.Set("wallet_address", "0x1234567890123456789012345678901234567890")
 
 	/*
-	@logic ExecuteHandler
-	@desc Call with malformed payload.
+		@logic ExecuteHandler
+		@desc Call with malformed payload.
 	*/
 	handler.CreateMarket(c)
 
 	/*
-	@logic AssertError
-	@desc Verify 400 response.
+		@logic AssertError
+		@desc Verify 400 response.
 	*/
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 
@@ -347,8 +347,8 @@ Test market creation with business logic validation failure.
 */
 func TestCreateMarket_ValidationError(t *testing.T) {
 	/*
-	@logic Setup
-	@desc Mock validator to return error.
+		@logic Setup
+		@desc Mock validator to return error.
 	*/
 	mockValidator := &mockMarketValidator{
 		validateCreationFn: func(borrower, borrowAsset, collateralAsset string, minRatio, liquidationThreshold int32) error {
@@ -381,14 +381,14 @@ func TestCreateMarket_ValidationError(t *testing.T) {
 	c.Set("wallet_address", "0x1234567890123456789012345678901234567890")
 
 	/*
-	@logic ExecuteHandler
-	@desc Call with invalid parameters.
+		@logic ExecuteHandler
+		@desc Call with invalid parameters.
 	*/
 	handler.CreateMarket(c)
 
 	/*
-	@logic AssertError
-	@desc Verify 400 response with validation error (ErrInvalidInput maps to 400).
+		@logic AssertError
+		@desc Verify 400 response with validation error (ErrInvalidInput maps to 400).
 	*/
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 
@@ -412,24 +412,24 @@ Test successful market retrieval by address.
 */
 func TestGetMarket_Success(t *testing.T) {
 	/*
-	@logic Setup
-	@desc Mock service to return market.
+		@logic Setup
+		@desc Mock service to return market.
 	*/
 	mockSvc := &mockMarketService{
 		getMarketFn: func(ctx context.Context, address string) (*models.Market, error) {
 			return &models.Market{
-				ID:                      1,
-				Address:                 address,
-				Borrower:                "0x1234567890123456789012345678901234567890",
-				BorrowAsset:             "0x6b175474e89094c44da98b954eedeac495271d0f",
-				CollateralAsset:         "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
-				TotalPrincipal:          big.NewInt(1000000),
-				TotalLiquidity:          big.NewInt(2000000),
-				TotalDebt:               big.NewInt(500000),
-				UtilizationRate:         0.25,
-				WeightedAvgAPR:          500,
-				IsActive:                true,
-				CreatedAt:               time.Now(),
+				ID:              1,
+				Address:         address,
+				Borrower:        "0x1234567890123456789012345678901234567890",
+				BorrowAsset:     "0x6b175474e89094c44da98b954eedeac495271d0f",
+				CollateralAsset: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+				TotalPrincipal:  big.NewInt(1000000),
+				TotalLiquidity:  big.NewInt(2000000),
+				TotalDebt:       big.NewInt(500000),
+				UtilizationRate: 0.25,
+				WeightedAvgAPR:  500,
+				IsActive:        true,
+				CreatedAt:       time.Now(),
 			}, nil
 		},
 	}
@@ -445,20 +445,20 @@ func TestGetMarket_Success(t *testing.T) {
 	c.Params = []gin.Param{{Key: "address", Value: "0xmarket"}}
 
 	/*
-	@logic ExecuteHandler
+		@logic ExecuteHandler
 	*/
 	handler.GetMarket(c)
 
 	/*
-	@logic AssertSuccess
-	@desc Verify 200 response with market data.
+		@logic AssertSuccess
+		@desc Verify 200 response with market data.
 	*/
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var respBody map[string]interface{}
 	json.Unmarshal(w.Body.Bytes(), &respBody)
 	assert.True(t, respBody["success"].(bool))
-	
+
 	data := respBody["data"].(map[string]interface{})
 	assert.Equal(t, "0xmarket", data["address"])
 	assert.Equal(t, true, data["is_active"])
@@ -475,8 +475,8 @@ Test market retrieval when market doesn't exist.
 */
 func TestGetMarket_NotFound(t *testing.T) {
 	/*
-	@logic Setup
-	@desc Mock service to return not found error.
+		@logic Setup
+		@desc Mock service to return not found error.
 	*/
 	mockSvc := &mockMarketService{
 		getMarketFn: func(ctx context.Context, address string) (*models.Market, error) {
@@ -495,13 +495,13 @@ func TestGetMarket_NotFound(t *testing.T) {
 	c.Params = []gin.Param{{Key: "address", Value: "0xnonexistent"}}
 
 	/*
-	@logic ExecuteHandler
+		@logic ExecuteHandler
 	*/
 	handler.GetMarket(c)
 
 	/*
-	@logic AssertError
-	@desc Verify 404 response with market not found error code.
+		@logic AssertError
+		@desc Verify 404 response with market not found error code.
 	*/
 	assert.Equal(t, http.StatusNotFound, w.Code)
 
@@ -524,26 +524,26 @@ Test successful market list retrieval with pagination.
 */
 func TestListMarkets_Success(t *testing.T) {
 	/*
-	@logic Setup
-	@desc Mock service to return list of markets.
+		@logic Setup
+		@desc Mock service to return list of markets.
 	*/
 	mockSvc := &mockMarketService{
 		listMarketsFn: func(ctx context.Context, limit, offset int32) ([]models.Market, error) {
 			return []models.Market{
 				{
-					Address:    "0xmarket1",
-					Borrower:   "0x1111111111111111111111111111111111111111",
-					IsActive:   true,
-					CreatedAt:  time.Now(),
+					Address:        "0xmarket1",
+					Borrower:       "0x1111111111111111111111111111111111111111",
+					IsActive:       true,
+					CreatedAt:      time.Now(),
 					TotalPrincipal: big.NewInt(1000000),
 					TotalLiquidity: big.NewInt(2000000),
 					TotalDebt:      big.NewInt(500000),
 				},
 				{
-					Address:    "0xmarket2",
-					Borrower:   "0x2222222222222222222222222222222222222222",
-					IsActive:   true,
-					CreatedAt:  time.Now(),
+					Address:        "0xmarket2",
+					Borrower:       "0x2222222222222222222222222222222222222222",
+					IsActive:       true,
+					CreatedAt:      time.Now(),
 					TotalPrincipal: big.NewInt(2000000),
 					TotalLiquidity: big.NewInt(4000000),
 					TotalDebt:      big.NewInt(1000000),
@@ -562,13 +562,13 @@ func TestListMarkets_Success(t *testing.T) {
 	c.Request, _ = http.NewRequest("GET", "/api/admin/markets?page=1&limit=20", nil)
 
 	/*
-	@logic ExecuteHandler
+		@logic ExecuteHandler
 	*/
 	handler.ListMarkets(c)
 
 	/*
-	@logic AssertSuccess
-	@desc Verify 200 response with market list.
+		@logic AssertSuccess
+		@desc Verify 200 response with market list.
 	*/
 	assert.Equal(t, http.StatusOK, w.Code)
 
@@ -594,13 +594,13 @@ Test successful market metrics retrieval.
 */
 func TestGetMarketMetrics_Success(t *testing.T) {
 	/*
-	@logic Setup
-	@desc Mock service to return metrics.
+		@logic Setup
+		@desc Mock service to return metrics.
 	*/
 	mockSvc := &mockMarketService{
 		getMarketFn: func(ctx context.Context, address string) (*models.Market, error) {
 			return &models.Market{
-				Address: address,
+				Address:  address,
 				IsActive: true,
 			}, nil
 		},
@@ -625,13 +625,13 @@ func TestGetMarketMetrics_Success(t *testing.T) {
 	c.Params = []gin.Param{{Key: "address", Value: "0xmarket"}}
 
 	/*
-	@logic ExecuteHandler
+		@logic ExecuteHandler
 	*/
 	handler.GetMarketMetrics(c)
 
 	/*
-	@logic AssertSuccess
-	@desc Verify 200 response with metrics.
+		@logic AssertSuccess
+		@desc Verify 200 response with metrics.
 	*/
 	assert.Equal(t, http.StatusOK, w.Code)
 
@@ -657,7 +657,7 @@ Test health check endpoint returns system status.
 */
 func TestHealthCheck_Success(t *testing.T) {
 	/*
-	@logic Setup
+		@logic Setup
 	*/
 	handler := &AdminHandler{
 		marketService: &mockMarketService{},
@@ -669,13 +669,13 @@ func TestHealthCheck_Success(t *testing.T) {
 	c.Request, _ = http.NewRequest("GET", "/api/admin/health", nil)
 
 	/*
-	@logic ExecuteHandler
+		@logic ExecuteHandler
 	*/
 	handler.HealthCheck(c)
 
 	/*
-	@logic AssertSuccess
-	@desc Verify 200 response.
+		@logic AssertSuccess
+		@desc Verify 200 response.
 	*/
 	assert.Equal(t, http.StatusOK, w.Code)
 

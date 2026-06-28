@@ -8,6 +8,7 @@ import (
 	"github.com/Revvfi/revvfi-backend/internal/api/dto/request"
 	"github.com/Revvfi/revvfi-backend/internal/api/dto/response"
 	"github.com/Revvfi/revvfi-backend/internal/core/position"
+	"github.com/Revvfi/revvfi-backend/internal/logger"
 )
 
 /*
@@ -51,16 +52,31 @@ Handles position detail requests.
 - c: Gin context
 */
 func (h *PositionHandler) Get(c *gin.Context) {
+	ctx := c.Request.Context()
+
 	tokenID, err := pathInt64(c, "tokenID")
 	if err != nil {
+		logger.WarnContext(ctx, "Invalid position token ID",
+			logger.WithError(err),
+		)
 		writeError(c, err)
 		return
 	}
-	found, err := h.service.GetPosition(c.Request.Context(), tokenID)
+
+	logger.DebugContext(ctx, "Fetching position",
+		logger.WithPositionID(tokenID),
+	)
+
+	found, err := h.service.GetPosition(ctx, tokenID)
 	if err != nil {
+		logger.WarnContext(ctx, "Position not found",
+			logger.WithPositionID(tokenID),
+			logger.WithError(err),
+		)
 		writeError(c, err)
 		return
 	}
+
 	ok(c, http.StatusOK, positionResponse(found))
 }
 

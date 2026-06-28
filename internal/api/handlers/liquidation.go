@@ -7,6 +7,7 @@ import (
 
 	"github.com/Revvfi/revvfi-backend/internal/api/dto/response"
 	"github.com/Revvfi/revvfi-backend/internal/core/liquidation"
+	"github.com/Revvfi/revvfi-backend/internal/models"
 )
 
 /*
@@ -44,26 +45,49 @@ func NewLiquidationHandler(service *liquidation.LiquidationService) *Liquidation
 @method Liquidatable
 
 @desc
-Handles liquidatable market listing requests.
+Handles active auction listing requests.
+Returns all active auctions across all markets.
 
 @params
 - c: Gin context
 */
 func (h *LiquidationHandler) Liquidatable(c *gin.Context) {
-	markets, err := h.service.GetLiquidatableMarkets(c.Request.Context())
+	// Check for market filter
+	marketAddress := c.Query("market_address")
+
+	var auctions []models.Auction
+	var err error
+
+	if marketAddress != "" {
+		// Get auctions for specific market
+		auctions, err = h.service.GetAuctionsByMarket(c.Request.Context(), marketAddress)
+	} else {
+		// Get all active auctions
+		auctions, err = h.service.GetActiveAuctions(c.Request.Context())
+	}
+
 	if err != nil {
 		writeError(c, err)
 		return
 	}
-	items := make([]response.LiquidatableMarket, 0, len(markets))
-	for i := range markets {
-		items = append(items, response.LiquidatableMarket{
-			MarketAddress: markets[i].Address,
-			Borrower:      markets[i].Borrower,
-			DebtAmount:    stringOrZero(markets[i].TotalDebt),
-		})
+
+	// Convert to response format with market asset info
+	items := make([]response.AuctionResponse, 0, len(auctions))
+	for i := range auctions {
+		// Fetch market info to get asset details
+		market, err := h.service.GetMarketByAddress(c.Request.Context(), auctions[i].MarketAddress)
+		if err != nil {
+			// If market not found, return auction without asset info
+			items = append(items, auctionResponse(&auctions[i], nil))
+		} else {
+			items = append(items, auctionResponse(&auctions[i], market))
+		}
 	}
-	ok(c, http.StatusOK, response.LiquidatableResponse{Markets: items, Count: int32(len(items)), TotalCollateral: "0", TotalDebt: "0"})
+
+	ok(c, http.StatusOK, gin.H{
+		"count":    len(items),
+		"auctions": items,
+	})
 }
 
 /*
@@ -81,7 +105,16 @@ func (h *LiquidationHandler) GetAuction(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	ok(c, http.StatusOK, auctionResponse(auction))
+
+	// Fetch market info to include asset details
+	market, err := h.service.GetMarketByAddress(c.Request.Context(), auction.MarketAddress)
+	if err != nil {
+		// Return auction without asset info if market not found
+		ok(c, http.StatusOK, auctionResponse(auction, nil))
+		return
+	}
+
+	ok(c, http.StatusOK, auctionResponse(auction, market))
 }
 
 /*

@@ -7,6 +7,7 @@ import (
 
 	"github.com/Revvfi/revvfi-backend/internal/api/dto/request"
 	"github.com/Revvfi/revvfi-backend/internal/core/market"
+	"github.com/Revvfi/revvfi-backend/internal/logger"
 )
 
 /*
@@ -50,15 +51,29 @@ Handles market creation requests.
 - c: Gin context
 */
 func (h *MarketHandler) Create(c *gin.Context) {
+	ctx := c.Request.Context()
 	var req request.CreateMarketRequest
+
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.WarnContext(ctx, "Invalid market creation request",
+			logger.WithError(err),
+		)
 		writeError(c, err)
 		return
 	}
 
 	wallet := c.GetString("wallet")
+
+	logger.InfoContext(ctx, "Creating market",
+		logger.WithWalletAddress(wallet),
+		logger.WithBorrowAsset(req.BorrowAsset),
+		logger.WithCollateralAsset(req.CollateralAsset),
+		"min_collateral_ratio", req.MinCollateralRatio,
+		"liquidation_threshold", req.LiquidationThreshold,
+	)
+
 	created, err := h.service.CreateMarket(
-		c.Request.Context(),
+		ctx,
 		"",
 		wallet,
 		req.BorrowAsset,
@@ -68,9 +83,19 @@ func (h *MarketHandler) Create(c *gin.Context) {
 		req.LiquidationThreshold,
 	)
 	if err != nil {
+		logger.ErrorContext(ctx, "Market creation failed",
+			logger.WithError(err),
+			logger.WithWalletAddress(wallet),
+			logger.WithBorrowAsset(req.BorrowAsset),
+		)
 		writeError(c, err)
 		return
 	}
+
+	logger.InfoContext(ctx, "Market created successfully",
+		logger.WithMarketAddress(created.Address),
+		logger.WithWalletAddress(wallet),
+	)
 
 	ok(c, http.StatusCreated, marketResponse(created))
 }
@@ -85,11 +110,23 @@ Handles market detail requests.
 - c: Gin context
 */
 func (h *MarketHandler) Get(c *gin.Context) {
-	found, err := h.service.GetMarket(c.Request.Context(), c.Param("address"))
+	ctx := c.Request.Context()
+	address := c.Param("address")
+
+	logger.DebugContext(ctx, "Fetching market",
+		logger.WithMarketAddress(address),
+	)
+
+	found, err := h.service.GetMarket(ctx, address)
 	if err != nil {
+		logger.WarnContext(ctx, "Market not found",
+			logger.WithMarketAddress(address),
+			logger.WithError(err),
+		)
 		writeError(c, err)
 		return
 	}
+
 	ok(c, http.StatusOK, marketResponse(found))
 }
 

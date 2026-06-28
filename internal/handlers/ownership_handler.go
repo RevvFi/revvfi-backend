@@ -51,6 +51,6 @@ func (h *OwnershipHandler) Handle(ctx context.Context, event interface{}, blockN
 		e.PreviousOwner.Hex(), e.NewOwner.Hex())
 
 	// TODO: Update factory_owner in protocol_config table
-	
+
 	return nil
 }

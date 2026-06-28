@@ -64,10 +64,9 @@ func (h *FeeHandler) Handle(ctx context.Context, event interface{}, blockNum uin
 func (h *FeeHandler) handleFeeUpdated(ctx context.Context, event *types.FeeUpdatedEvent, blockNum uint64) error {
 	log.Printf(" FeeUpdated: OldFee=%s ETH, NewFee=%s ETH",
 		event.OldFee.String(), event.NewFee.String())
-	
 	// TODO: Save to fee_audit_log table if tracking is needed
 	// return h.eventRepo.RecordFeeChange(ctx, event.OldFee, event.NewFee, blockNum)
-	
+
 	return nil
 }
 
@@ -80,6 +79,5 @@ func (h *FeeHandler) handleFeeUpdated(ctx context.Context, event *types.FeeUpdat
 func (h *FeeHandler) handleDeploymentFeeUpdated(ctx context.Context, event *types.DeploymentFeeUpdatedEvent, blockNum uint64) error {
 	log.Printf(" DeploymentFeeUpdated: OldFee=%s ETH, NewFee=%s ETH",
 		event.OldFee.String(), event.NewFee.String())
-	
 	return nil
 }

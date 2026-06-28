@@ -3,19 +3,24 @@ package indexer
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/big"
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/Revvfi/revvfi-backend/internal/handlers"
 	"github.com/Revvfi/revvfi-backend/internal/indexer/decoder"
+	"github.com/Revvfi/revvfi-backend/internal/indexer/helpers"
 	"github.com/Revvfi/revvfi-backend/internal/indexer/idempotency"
 	"github.com/Revvfi/revvfi-backend/internal/indexer/poller"
 	"github.com/Revvfi/revvfi-backend/internal/indexer/processor"
+	"github.com/Revvfi/revvfi-backend/internal/indexer/registry"
 	"github.com/Revvfi/revvfi-backend/internal/indexer/reorg"
+	"github.com/Revvfi/revvfi-backend/internal/logger"
 	"github.com/Revvfi/revvfi-backend/internal/models"
 	"github.com/Revvfi/revvfi-backend/internal/repository/postgres"
 )
@@ -25,10 +30,12 @@ import (
  * @desc Main indexer worker that orchestrates all components
  */
 type Worker struct {
-	config         *Config
-	ethClient      *ethclient.Client
-	eventRepo      *postgres.EventRepository
-	checkpointRepo *postgres.CheckpointRepository
+	config           *Config
+	ethClient        *ethclient.Client
+	eventRepo        *postgres.EventRepository
+	checkpointRepo   *postgres.CheckpointRepository
+	marketRepo       *postgres.MarketRepository
+	contractRegistry *registry.ContractRegistry
 
 	// Components
 	poller         *poller.BlockPoller
@@ -55,6 +62,7 @@ func NewWorker(
 	ethClient *ethclient.Client,
 	eventRepo *postgres.EventRepository,
 	checkpointRepo *postgres.CheckpointRepository,
+	marketRepo *postgres.MarketRepository,
 ) (*Worker, error) {
 	// Initialize components
 	eventDecoder, err := decoder.NewEventDecoder(cfg.ArtifactPath)
@@ -62,8 +70,20 @@ func NewWorker(
 		return nil, err
 	}
 
-	// Create handler registry
-	handlerRegistry := handlers.NewRegistry(eventRepo)
+	// Create contract registry
+	contractRegistry := registry.NewContractRegistry()
+
+	// Add core contracts (always watch these)
+	contractRegistry.AddContract(common.HexToAddress(cfg.FactoryAddress), "Factory")
+	contractRegistry.AddContract(common.HexToAddress(cfg.ArchControllerAddress), "ArchController")
+	contractRegistry.AddContract(common.HexToAddress(cfg.PositionNFTAddress), "PositionNFT")
+	contractRegistry.AddContract(common.HexToAddress(cfg.LiquidatorAddress), "Liquidator")
+	contractRegistry.AddContract(common.HexToAddress(cfg.ReputationRegistryAddress), "ReputationRegistry")
+
+	log.Printf("Added %d core contracts to registry", contractRegistry.Count())
+
+	// Create handler registry with contract registry
+	handlerRegistry := handlers.NewRegistry(eventRepo, ethClient, contractRegistry)
 
 	// Create idempotency tracker
 	idempotencyTracker := idempotency.NewTracker(eventRepo)
@@ -88,14 +108,16 @@ func NewWorker(
 		5, // worker count
 	)
 
-	// Create block poller
-	blockPoller := poller.NewBlockPoller(ethClient, checkpointRepo, cfg)
+	// Create block poller with contract registry
+	blockPoller := poller.NewBlockPoller(ethClient, checkpointRepo, cfg, contractRegistry)
 
-	return &Worker{
+	worker := &Worker{
 		config:             cfg,
 		ethClient:          ethClient,
 		eventRepo:          eventRepo,
 		checkpointRepo:     checkpointRepo,
+		marketRepo:         marketRepo,
+		contractRegistry:   contractRegistry,
 		poller:             blockPoller,
 		decoder:            eventDecoder,
 		idempotency:        idempotencyTracker,
@@ -103,7 +125,18 @@ func NewWorker(
 		eventProcessor:     eventProcessor,
 		dispatcher:         dispatcher,
 		lastProcessedBlock: uint64(cfg.StartBlock),
-	}, nil
+	}
+
+	// Load existing markets from database
+	ctx := context.Background()
+	if err := worker.loadMarketsFromDatabase(ctx); err != nil {
+		logger.WarnContext(ctx, "Failed to load markets from database",
+			logger.WithError(err),
+		)
+		// Don't fail startup, just log warning
+	}
+
+	return worker, nil
 }
 
 /*@
@@ -312,4 +345,48 @@ func (w *Worker) saveCheckpoint(ctx context.Context, blockNum uint64) error {
 		ParentHash:  block.ParentHash().Hex(),
 		ProcessedAt: time.Now(),
 	})
+}
+
+/*
+ * loadMarketsFromDatabase
+ * @desc Loads all known markets from database and adds them to the registry
+ */
+func (w *Worker) loadMarketsFromDatabase(ctx context.Context) error {
+	// Get all active markets from database
+	markets, err := w.marketRepo.GetAllActive(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get markets: %w", err)
+	}
+
+	log.Printf("Loading %d markets from database", len(markets))
+
+	// Add each market and query its child contracts
+	for _, market := range markets {
+		marketAddr := common.HexToAddress(market.Address)
+
+		// Add market itself
+		w.contractRegistry.AddContract(marketAddr, "Market")
+
+		// Query and add child contracts
+		children, err := helpers.GetMarketChildContracts(ctx, w.ethClient, marketAddr)
+		if err != nil {
+			log.Printf("Failed to query market %s children, skipping: %v", market.Address, err)
+			continue
+		}
+
+		w.contractRegistry.AddContract(children.OfferBook, "OfferBook")
+		w.contractRegistry.AddContract(children.CollateralEscrow, "CollateralEscrow")
+
+		// LiquidityQueue is optional
+		if children.LiquidityQueue != (common.Address{}) {
+			w.contractRegistry.AddContract(children.LiquidityQueue, "LiquidityQueue")
+		}
+
+		log.Printf("Added market %s and children to registry (OfferBook: %s)",
+			market.Address, children.OfferBook.Hex())
+	}
+
+	log.Printf("Finished loading markets, now watching %d contracts total", w.contractRegistry.Count())
+
+	return nil
 }

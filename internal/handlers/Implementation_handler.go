@@ -51,6 +51,6 @@ func (h *ImplementationHandler) Handle(ctx context.Context, event interface{}, b
 		e.MarketImpl.Hex(), e.EscrowImpl.Hex(), e.OfferBookImpl.Hex(), e.LiquidityQueueImpl.Hex())
 
 	// TODO: Save to implementation_versions table for tracking upgrades
-	
+
 	return nil
 }

@@ -51,6 +51,7 @@ type AuctionRepository interface {
 	CreateAuction(ctx context.Context, auction *models.Auction) error
 	GetByID(ctx context.Context, auctionID string) (*models.Auction, error)
 	GetActiveByMarket(ctx context.Context, market string) ([]models.Auction, error)
+	GetAllActive(ctx context.Context) ([]models.Auction, error)
 	UpdateAuction(ctx context.Context, auction *models.Auction) error
 	GetLiquidatableCount(ctx context.Context) (int64, error)
 }
@@ -211,6 +212,81 @@ auctionID string,
 	auction.CurrentPrice = currentPrice
 
 	return auction, nil
+}
+
+/*
+@function GetActiveAuctions
+
+@desc
+Gets all active auctions across all markets.
+
+@params
+- ctx: request context
+
+@returns
+- []models.Auction: list of active auctions
+- error: if query fails
+*/
+func (s *LiquidationService) GetActiveAuctions(ctx context.Context) ([]models.Auction, error) {
+	auctions, err := s.auctionRepo.GetAllActive(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch active auctions: %w", err)
+	}
+
+	// Update current prices for all auctions
+	for i := range auctions {
+		currentPrice := s.auction.CalculateDutchPrice(&auctions[i])
+		auctions[i].CurrentPrice = currentPrice
+	}
+
+	return auctions, nil
+}
+
+/*
+@function GetAuctionsByMarket
+
+@desc
+Gets active auctions for a specific market.
+
+@params
+- ctx: request context
+- marketAddress: market address to filter by
+
+@returns
+- []models.Auction: list of active auctions for the market
+- error: if query fails
+*/
+func (s *LiquidationService) GetAuctionsByMarket(ctx context.Context, marketAddress string) ([]models.Auction, error) {
+	auctions, err := s.auctionRepo.GetActiveByMarket(ctx, marketAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch auctions for market: %w", err)
+	}
+
+	// Update current prices for all auctions
+	for i := range auctions {
+		currentPrice := s.auction.CalculateDutchPrice(&auctions[i])
+		auctions[i].CurrentPrice = currentPrice
+	}
+
+	return auctions, nil
+}
+
+/*
+@function GetMarketByAddress
+
+@desc
+Gets market information by address.
+
+@params
+- ctx: request context
+- marketAddress: market contract address
+
+@returns
+- *models.Market: market information
+- error: if query fails
+*/
+func (s *LiquidationService) GetMarketByAddress(ctx context.Context, marketAddress string) (*models.Market, error) {
+	return s.marketRepo.GetByAddress(ctx, marketAddress)
 }
 
 /*

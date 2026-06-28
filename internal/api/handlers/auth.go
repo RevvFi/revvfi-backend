@@ -6,6 +6,7 @@ import (
 	"github.com/Revvfi/revvfi-backend/internal/api/dto/request"
 	"github.com/Revvfi/revvfi-backend/internal/api/dto/response"
 	"github.com/Revvfi/revvfi-backend/internal/core/auth"
+	"github.com/Revvfi/revvfi-backend/internal/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -71,17 +72,34 @@ Generates SIWE nonce for wallet signing.
 - 500: nonce generation failure
 */
 func (h *AuthHandler) GetNonce(c *gin.Context) {
+	ctx := c.Request.Context()
 	var req request.NonceRequest
+
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.WarnContext(ctx, "Invalid nonce request",
+			logger.WithError(err),
+		)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-    
-	nonce, message, err := h.authService.GenerateNonce(c.Request.Context(), req.WalletAddress)
+
+	logger.InfoContext(ctx, "Generating nonce",
+		logger.WithWalletAddress(req.WalletAddress),
+	)
+
+	nonce, message, err := h.authService.GenerateNonce(ctx, req.WalletAddress)
 	if err != nil {
+		logger.ErrorContext(ctx, "Nonce generation failed",
+			logger.WithError(err),
+			logger.WithWalletAddress(req.WalletAddress),
+		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	logger.DebugContext(ctx, "Nonce generated successfully",
+		logger.WithWalletAddress(req.WalletAddress),
+	)
 
 	c.JSON(http.StatusOK, response.NonceResponse{
 		Nonce:   nonce,
@@ -115,17 +133,34 @@ Verifies wallet signature and issues JWT token.
 - 500: internal error
 */
 func (h *AuthHandler) Login(c *gin.Context) {
+	ctx := c.Request.Context()
 	var req request.LoginRequest
+
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.WarnContext(ctx, "Invalid login request",
+			logger.WithError(err),
+		)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	token, expiresAt, err := h.authService.Login(c.Request.Context(), req.WalletAddress, req.Message, req.Signature)
+	logger.InfoContext(ctx, "Login attempt",
+		logger.WithWalletAddress(req.WalletAddress),
+	)
+
+	token, expiresAt, err := h.authService.Login(ctx, req.WalletAddress, req.Message, req.Signature)
 	if err != nil {
+		logger.WarnContext(ctx, "Login failed - signature verification failed",
+			logger.WithError(err),
+			logger.WithWalletAddress(req.WalletAddress),
+		)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication failed"})
 		return
 	}
+
+	logger.InfoContext(ctx, "Login successful",
+		logger.WithWalletAddress(req.WalletAddress),
+	)
 
 	c.JSON(http.StatusOK, response.LoginResponse{
 		Token:         token,
@@ -149,16 +184,32 @@ Revokes active JWT token.
 - 500: revocation failure
 */
 func (h *AuthHandler) Logout(c *gin.Context) {
+	ctx := c.Request.Context()
 	token := c.GetString("token") // Set by auth middleware
+	wallet := c.GetString("wallet")
+
 	if token == "" {
+		logger.WarnContext(ctx, "Logout attempted without token")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
 		return
 	}
 
-	if err := h.authService.Logout(c.Request.Context(), token); err != nil {
+	logger.InfoContext(ctx, "User logout",
+		logger.WithWalletAddress(wallet),
+	)
+
+	if err := h.authService.Logout(ctx, token); err != nil {
+		logger.ErrorContext(ctx, "Logout failed",
+			logger.WithError(err),
+			logger.WithWalletAddress(wallet),
+		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	logger.InfoContext(ctx, "Logout successful",
+		logger.WithWalletAddress(wallet),
+	)
 
 	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
 }

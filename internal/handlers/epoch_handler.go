@@ -84,11 +84,11 @@ func (h *EpochHandler) Handle(ctx context.Context, event interface{}, blockNum u
 		TotalRequested: e.TotalRequested,
 		TotalFulfilled: e.TotalFulfilled,
 		Status:         "completed",
-		ProcessedAt:    sql.NullTime{
-        Time:  time.Now(),
-        Valid: true,
-    },
-		CreatedAt:      time.Now(),
+		ProcessedAt: sql.NullTime{
+			Time:  time.Now(),
+			Valid: true,
+		},
+		CreatedAt: time.Now(),
 	}
 
 	// Save epoch and update all withdrawal requests in this epoch

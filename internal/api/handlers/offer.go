@@ -9,6 +9,7 @@ import (
 	"github.com/Revvfi/revvfi-backend/internal/api/dto/request"
 	"github.com/Revvfi/revvfi-backend/internal/api/dto/response"
 	"github.com/Revvfi/revvfi-backend/internal/core/offer"
+	"github.com/Revvfi/revvfi-backend/internal/logger"
 )
 
 /*
@@ -52,23 +53,54 @@ Handles authenticated offer creation requests.
 - c: Gin context
 */
 func (h *OfferHandler) Create(c *gin.Context) {
+	ctx := c.Request.Context()
 	var req request.CreateOfferRequest
+
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.WarnContext(ctx, "Invalid offer creation request",
+			logger.WithError(err),
+		)
 		writeError(c, err)
 		return
 	}
 
 	amount, err := parseBigInt(req.Amount)
 	if err != nil {
+		logger.WarnContext(ctx, "Invalid offer amount",
+			logger.WithError(err),
+			"amount", req.Amount,
+		)
 		writeError(c, err)
 		return
 	}
 
-	created, err := h.service.CreateOffer(c.Request.Context(), time.Now().UnixNano(), c.GetString("wallet"), req.MarketAddress, amount, req.APR, req.Seniority, req.ExpiryDays)
+	wallet := c.GetString("wallet")
+
+	logger.InfoContext(ctx, "Creating offer",
+		logger.WithWalletAddress(wallet),
+		logger.WithMarketAddress(req.MarketAddress),
+		logger.WithAmount(amount.String()),
+		logger.WithAPR(int(req.APR)),
+		logger.WithSeniority(int(req.Seniority)),
+	)
+
+	created, err := h.service.CreateOffer(ctx, time.Now().UnixNano(), wallet, req.MarketAddress, amount, req.APR, req.Seniority, req.ExpiryDays)
 	if err != nil {
+		logger.ErrorContext(ctx, "Offer creation failed",
+			logger.WithError(err),
+			logger.WithWalletAddress(wallet),
+			logger.WithMarketAddress(req.MarketAddress),
+		)
 		writeError(c, err)
 		return
 	}
+
+	logger.InfoContext(ctx, "Offer created successfully",
+		logger.WithOfferID(created.OfferID),
+		logger.WithWalletAddress(wallet),
+		logger.WithMarketAddress(req.MarketAddress),
+	)
+
 	ok(c, http.StatusCreated, offerResponse(created))
 }
 

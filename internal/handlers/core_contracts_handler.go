@@ -52,6 +52,6 @@ func (h *CoreContractsHandler) Handle(ctx context.Context, event interface{}, bl
 
 	// TODO: Save to a protocol_config table if needed for tracking
 	// For now, just log as these addresses are already in config
-	
+
 	return nil
 }

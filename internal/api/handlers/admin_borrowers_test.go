@@ -38,11 +38,11 @@ Mock implementation of AdminBorrowerService for testing.
 Allows controlled behavior for testing handlers.
 */
 type mockAdminBorrowerService struct {
-	listBorrowersFn              func(ctx interface{}, page, limit int32, status, search string) (*response.BorrowerListResponse, error)
-	getBorrowerFn                func(ctx interface{}, borrowerAddress string) (*response.BorrowerInfo, error)
-	getPendingBorrowersFn        func(ctx interface{}) (*response.PendingBorrowerResponse, error)
-	prepareBorrowerAdditionFn    func(ctx interface{}, borrowerAddress string, isVerified bool) (string, error)
-	prepareBorrowerRemovalFn     func(ctx interface{}, borrowerAddress, reason string, closePositions bool) (string, error)
+	listBorrowersFn           func(ctx interface{}, page, limit int32, status, search string) (*response.BorrowerListResponse, error)
+	getBorrowerFn             func(ctx interface{}, borrowerAddress string) (*response.BorrowerInfo, error)
+	getPendingBorrowersFn     func(ctx interface{}) (*response.PendingBorrowerResponse, error)
+	prepareBorrowerAdditionFn func(ctx interface{}, borrowerAddress string, isVerified bool) (string, error)
+	prepareBorrowerRemovalFn  func(ctx interface{}, borrowerAddress, reason string, closePositions bool) (string, error)
 }
 
 /*
@@ -300,9 +300,9 @@ func TestGetPendingBorrowers_Success(t *testing.T) {
 				OldestPendingAt: 1685356800,
 				Borrowers: []response.BorrowerInfo{
 					{
-						Address:      "0x1234567890123456789012345678901234567890",
-						IsVerified:   false,
-						AddedAt:      1685356800,
+						Address:    "0x1234567890123456789012345678901234567890",
+						IsVerified: false,
+						AddedAt:    1685356800,
 					},
 				},
 			}, nil

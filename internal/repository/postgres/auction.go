@@ -69,6 +69,21 @@ func (r *AuctionRepository) GetActiveByMarket(ctx context.Context, market string
 }
 
 /*
+@method GetAllActive
+
+@desc
+Lists all active auctions across all markets.
+*/
+func (r *AuctionRepository) GetAllActive(ctx context.Context) ([]models.Auction, error) {
+	rows, err := r.db.conn.QueryContext(ctx, `select id,auction_id,market_address,borrower_address,collateral_amount,collateral_value,debt_amount,highest_bid,highest_bidder,current_price,start_time,end_time,settlement_time,status,winning_bid,winner,recovery_rate,created_at,updated_at from auctions where status='active' order by created_at desc`)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	defer rows.Close()
+	return scanAuctions(rows)
+}
+
+/*
 @method UpdateAuction
 
 @desc

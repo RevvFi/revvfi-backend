@@ -37,9 +37,9 @@ Mock implementation of AdminAuthService for testing.
 Allows controlled behavior for testing handlers.
 */
 type mockAdminAuthService struct {
-	isAdminFn                func(ctx interface{}, address string) (bool, error)
-	getAdminRoleFn           func(ctx interface{}, address string) (string, error)
-	getAdminPermissionsFn    func(ctx interface{}, address string) ([]string, error)
+	isAdminFn                  func(ctx interface{}, address string) (bool, error)
+	getAdminRoleFn             func(ctx interface{}, address string) (string, error)
+	getAdminPermissionsFn      func(ctx interface{}, address string) ([]string, error)
 	generateImpersonateTokenFn func(ctx interface{}, adminAddress, reason string) (string, int64, error)
 	validateImpersonateTokenFn func(token string) (string, error)
 }
@@ -112,8 +112,8 @@ Test successful admin verification returns correct status.
 */
 func TestCheckAdmin_Success(t *testing.T) {
 	/*
-	@logic Setup
-	@desc Initialize mock service and handler.
+		@logic Setup
+		@desc Initialize mock service and handler.
 	*/
 	mockSvc := &mockAdminAuthService{
 		isAdminFn: func(ctx interface{}, address string) (bool, error) {
@@ -130,8 +130,8 @@ func TestCheckAdmin_Success(t *testing.T) {
 	handler := NewAdminAuthHandler(mockSvc)
 
 	/*
-	@logic CreateContext
-	@desc Create test context with address parameter.
+		@logic CreateContext
+		@desc Create test context with address parameter.
 	*/
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
@@ -140,14 +140,14 @@ func TestCheckAdmin_Success(t *testing.T) {
 	c.Params = []gin.Param{{Key: "address", Value: "0x1234567890123456789012345678901234567890"}}
 
 	/*
-	@logic ExecuteHandler
-	@desc Call CheckAdmin handler.
+		@logic ExecuteHandler
+		@desc Call CheckAdmin handler.
 	*/
 	handler.CheckAdmin(c)
 
 	/*
-	@logic AssertResponse
-	@desc Verify status code and response structure.
+		@logic AssertResponse
+		@desc Verify status code and response structure.
 	*/
 	assert.Equal(t, http.StatusOK, w.Code)
 

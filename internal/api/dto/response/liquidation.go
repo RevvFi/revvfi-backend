@@ -71,18 +71,37 @@ Response containing auction details.
 - EndTime: auction end
 */
 type AuctionResponse struct {
-	AuctionID        int64  `json:"auction_id"`
-	MarketAddress    string `json:"market_address"`
-	Borrower         string `json:"borrower"`
-	CollateralAmount string `json:"collateral_amount"`
-	DebtAmount       string `json:"debt_amount"`
-	CurrentPrice     string `json:"current_price"`
-	HighestBid       string `json:"highest_bid"`
-	HighestBidder    string `json:"highest_bidder,omitempty"`
-	Status           string `json:"status"`
-	TimeRemaining    int64  `json:"time_remaining"`
-	StartTime        int64  `json:"start_time"`
-	EndTime          int64  `json:"end_time"`
+	AuctionID        int64      `json:"auction_id"`
+	MarketAddress    string     `json:"market_address"`
+	Borrower         string     `json:"borrower"`
+	CollateralAmount string     `json:"collateral_amount"`
+	DebtAmount       string     `json:"debt_amount"`
+	CurrentPrice     string     `json:"current_price"`
+	HighestBid       string     `json:"highest_bid"`
+	HighestBidder    string     `json:"highest_bidder,omitempty"`
+	Status           string     `json:"status"`
+	TimeRemaining    int64      `json:"time_remaining"`
+	StartTime        int64      `json:"start_time"`
+	EndTime          int64      `json:"end_time"`
+	BorrowAsset      *AssetInfo `json:"borrow_asset,omitempty"`
+	CollateralAsset  *AssetInfo `json:"collateral_asset,omitempty"`
+}
+
+/*
+@struct AssetInfo
+
+@desc
+Token asset information for auctions and markets.
+
+@fields
+- Address: token contract address
+- Symbol: token symbol (e.g., USDC, WETH)
+- Decimals: token decimals
+*/
+type AssetInfo struct {
+	Address  string `json:"address"`
+	Symbol   string `json:"symbol"`
+	Decimals int    `json:"decimals"`
 }
 
 /*

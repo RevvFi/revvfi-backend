@@ -95,15 +95,16 @@ Path parameter:
 
 @response (success)
 HTTP 200 OK
-{
-  "success": true,
-  "data": {
-    "is_admin": true,
-    "role": "ARCH_CONTROLLER_OWNER",
-    "permissions": ["create_market", "pause_market", "set_fees"],
-    "arch_controller_address": "0x..."
-  }
-}
+
+	{
+	  "success": true,
+	  "data": {
+	    "is_admin": true,
+	    "role": "ARCH_CONTROLLER_OWNER",
+	    "permissions": ["create_market", "pause_market", "set_fees"],
+	    "arch_controller_address": "0x..."
+	  }
+	}
 
 @error_cases
 - 400: Invalid address format (not valid Ethereum address)
@@ -112,9 +113,9 @@ HTTP 200 OK
 */
 func (h *AdminAuthHandler) CheckAdmin(c *gin.Context) {
 	/*
-	@logic ExtractParameter
-	@desc Extract and validate address from URL path.
-	@notes Address must be valid Ethereum format (0x...).
+		@logic ExtractParameter
+		@desc Extract and validate address from URL path.
+		@notes Address must be valid Ethereum format (0x...).
 	*/
 	address := c.Param("address")
 	if address == "" {
@@ -129,9 +130,9 @@ func (h *AdminAuthHandler) CheckAdmin(c *gin.Context) {
 	}
 
 	/*
-	@logic CallServiceLayer
-	@desc Call auth service to verify admin status.
-	@error_cases Service may return errors if address invalid.
+		@logic CallServiceLayer
+		@desc Call auth service to verify admin status.
+		@error_cases Service may return errors if address invalid.
 	*/
 	isAdmin, err := h.authService.IsAdmin(c.Request.Context(), address)
 	if err != nil {
@@ -147,9 +148,9 @@ func (h *AdminAuthHandler) CheckAdmin(c *gin.Context) {
 	}
 
 	/*
-	@logic BuildResponse
-	@desc Construct response with admin status and permissions.
-	@notes Only include role/permissions if address is admin.
+		@logic BuildResponse
+		@desc Construct response with admin status and permissions.
+		@notes Only include role/permissions if address is admin.
 	*/
 	resp := response.AdminCheckResponse{
 		IsAdmin: isAdmin,
@@ -157,9 +158,9 @@ func (h *AdminAuthHandler) CheckAdmin(c *gin.Context) {
 
 	if isAdmin {
 		/*
-		@logic GetAdminDetails
-		@desc Retrieve role and permissions for admin address.
-		@notes Called only if address is confirmed admin.
+			@logic GetAdminDetails
+			@desc Retrieve role and permissions for admin address.
+			@notes Called only if address is confirmed admin.
 		*/
 		role, err := h.authService.GetAdminRole(c.Request.Context(), address)
 		if err == nil {
@@ -176,8 +177,8 @@ func (h *AdminAuthHandler) CheckAdmin(c *gin.Context) {
 	}
 
 	/*
-	@logic ReturnResponse
-	@desc Return success response with admin information.
+		@logic ReturnResponse
+		@desc Return success response with admin information.
 	*/
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -196,23 +197,25 @@ DISABLED IN PRODUCTION - checked via environment variable.
 @route POST /api/v1/admin/auth/impersonate
 
 @request
-{
-  "admin_address": "0x...",
-  "reason": "Testing market creation flow"
-}
+
+	{
+	  "admin_address": "0x...",
+	  "reason": "Testing market creation flow"
+	}
 
 @response (success)
 HTTP 200 OK
-{
-  "success": true,
-  "data": {
-    "admin_address": "0x...",
-    "token": "eyJhbGc...",
-    "reason": "Testing...",
-    "expires_at": 1685356800,
-    "valid_for_seconds": 3600
-  }
-}
+
+	{
+	  "success": true,
+	  "data": {
+	    "admin_address": "0x...",
+	    "token": "eyJhbGc...",
+	    "reason": "Testing...",
+	    "expires_at": 1685356800,
+	    "valid_for_seconds": 3600
+	  }
+	}
 
 @error_cases
 - 400: Invalid request format or missing fields
@@ -223,17 +226,17 @@ HTTP 200 OK
 */
 func (h *AdminAuthHandler) Impersonate(c *gin.Context) {
 	/*
-	@logic CheckEnvironment
-	@desc Verify impersonation is allowed in current environment.
-	@notes Feature only available in development (dev/staging).
+		@logic CheckEnvironment
+		@desc Verify impersonation is allowed in current environment.
+		@notes Feature only available in development (dev/staging).
 	*/
 	// TODO: Check if environment is dev/staging
 	// For now, allow all requests (production check should be implemented)
 
 	/*
-	@logic ParseRequest
-	@desc Parse and validate impersonate request from JSON body.
-	@notes Standard Gin binding with validation tags.
+		@logic ParseRequest
+		@desc Parse and validate impersonate request from JSON body.
+		@notes Standard Gin binding with validation tags.
 	*/
 	var req request.ImpersonateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -248,20 +251,20 @@ func (h *AdminAuthHandler) Impersonate(c *gin.Context) {
 	}
 
 	/*
-	@logic ValidateAddress
-	@desc Verify admin address is valid and exists.
-	@notes Will be checked by service layer.
+		@logic ValidateAddress
+		@desc Verify admin address is valid and exists.
+		@notes Will be checked by service layer.
 	*/
 
 	/*
-	@logic GenerateToken
-	@desc Call service to generate impersonation token.
-	@params
-	  - adminAddress: wallet to impersonate
-	  - reason: reason for impersonation (audit trail)
-	@returns
-	  - token: JWT token for impersonation
-	  - expiresAt: unix timestamp when token expires
+		@logic GenerateToken
+		@desc Call service to generate impersonation token.
+		@params
+		  - adminAddress: wallet to impersonate
+		  - reason: reason for impersonation (audit trail)
+		@returns
+		  - token: JWT token for impersonation
+		  - expiresAt: unix timestamp when token expires
 	*/
 	token, expiresAt, err := h.authService.GenerateImpersonateToken(
 		c.Request.Context(),
@@ -281,9 +284,9 @@ func (h *AdminAuthHandler) Impersonate(c *gin.Context) {
 	}
 
 	/*
-	@logic BuildResponse
-	@desc Construct response with token and expiration details.
-	@notes Include validity duration for client convenience.
+		@logic BuildResponse
+		@desc Construct response with token and expiration details.
+		@notes Include validity duration for client convenience.
 	*/
 	now := int64(0) // TODO: get current time
 	validForSeconds := expiresAt - now
@@ -297,9 +300,9 @@ func (h *AdminAuthHandler) Impersonate(c *gin.Context) {
 	}
 
 	/*
-	@logic ReturnResponse
-	@desc Return success response with impersonate token.
-	@notes Token should be used in Authorization header.
+		@logic ReturnResponse
+		@desc Return success response with impersonate token.
+		@notes Token should be used in Authorization header.
 	*/
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -324,24 +327,25 @@ Query parameters (optional):
 
 @response (success)
 HTTP 200 OK
-{
-  "success": true,
-  "data": {
-    "admins": [
-      {
-        "address": "0x...",
-        "role": "ARCH_CONTROLLER_OWNER",
-        "permissions": [...],
-        "added_at": 1685356800
-      }
-    ],
-    "pagination": {
-      "page": 1,
-      "limit": 20,
-      "total": 5
-    }
-  }
-}
+
+	{
+	  "success": true,
+	  "data": {
+	    "admins": [
+	      {
+	        "address": "0x...",
+	        "role": "ARCH_CONTROLLER_OWNER",
+	        "permissions": [...],
+	        "added_at": 1685356800
+	      }
+	    ],
+	    "pagination": {
+	      "page": 1,
+	      "limit": 20,
+	      "total": 5
+	    }
+	  }
+	}
 
 @error_cases
 - 400: Invalid pagination parameters
@@ -350,36 +354,36 @@ HTTP 200 OK
 */
 func (h *AdminAuthHandler) ListAdmins(c *gin.Context) {
 	/*
-	@logic ValidatePermissions
-	@desc Check if caller has permission to view admin list.
-	@notes Only OWNER and MANAGER can view admin list.
+		@logic ValidatePermissions
+		@desc Check if caller has permission to view admin list.
+		@notes Only OWNER and MANAGER can view admin list.
 	*/
 	// TODO: Implement permission check
 
 	/*
-	@logic GetPaginationParams
-	@desc Extract pagination parameters from query string.
-	@notes Validate limits (max 100 per page).
+		@logic GetPaginationParams
+		@desc Extract pagination parameters from query string.
+		@notes Validate limits (max 100 per page).
 	*/
 	// TODO: Extract page and limit from query
 	page := 1
 	limit := 20
 
 	/*
-	@logic FetchAdminsList
-	@desc Call service to fetch list of all admins.
-	@params
-	  - page: pagination page
-	  - limit: results per page
-	@returns
-	  - admins: list of admin addresses with roles
-	  - total: total number of admins
+		@logic FetchAdminsList
+		@desc Call service to fetch list of all admins.
+		@params
+		  - page: pagination page
+		  - limit: results per page
+		@returns
+		  - admins: list of admin addresses with roles
+		  - total: total number of admins
 	*/
 	// TODO: Call service
 
 	/*
-	@logic BuildResponse
-	@desc Construct paginated response with admin list.
+		@logic BuildResponse
+		@desc Construct paginated response with admin list.
 	*/
 	resp := response.AdminListResponse{
 		Admins: []response.AdminInfo{},
