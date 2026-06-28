@@ -30,9 +30,9 @@ Covers all three endpoints with success and error paths.
 Mock implementation of AdminReputationServiceInterface for handler testing.
 */
 type mockAdminReputationService struct {
-	getBorrowerReputationFn  func(ctx interface{}, address string) (*response.BorrowerReputation, error)
-	prepareSetReputationFn   func(ctx interface{}, address string, newScore int32, adminAddress, reason string) (*response.TransactionPreparation, error)
-	getDefaultedBorrowersFn  func(ctx interface{}, page, limit int32) (*response.DefaultedBorrowersResponse, error)
+	getBorrowerReputationFn func(ctx interface{}, address string) (*response.BorrowerReputation, error)
+	prepareSetReputationFn  func(ctx interface{}, address string, newScore int32, adminAddress, reason string) (*response.TransactionPreparation, error)
+	getDefaultedBorrowersFn func(ctx interface{}, page, limit int32) (*response.DefaultedBorrowersResponse, error)
 }
 
 /*

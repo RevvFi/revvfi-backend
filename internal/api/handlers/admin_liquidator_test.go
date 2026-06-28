@@ -138,12 +138,12 @@ func TestAdminLiquidatorHandler_PrepareSetLiquidatorParams(t *testing.T) {
 		h := NewAdminLiquidatorHandler(svc)
 
 		body, _ := json.Marshal(map[string]interface{}{
-			"auction_duration_seconds":   86400,
-			"price_drop_rate_bps":        500,
-			"min_bid_increment_bps":      100,
-			"liquidation_incentive_bps":  300,
-			"max_slippage_bps":           200,
-			"reason":                     "tuning",
+			"auction_duration_seconds":  86400,
+			"price_drop_rate_bps":       500,
+			"min_bid_increment_bps":     100,
+			"liquidation_incentive_bps": 300,
+			"max_slippage_bps":          200,
+			"reason":                    "tuning",
 		})
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)

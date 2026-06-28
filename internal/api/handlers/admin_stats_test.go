@@ -29,12 +29,12 @@ Covers all six stat endpoints with success and error cases.
 Mock implementation of AdminStatsServiceInterface for handler testing.
 */
 type mockAdminStatsService struct {
-	getOverviewFn          func(ctx interface{}) (*response.OverviewStats, error)
-	getBorrowerStatsFn     func(ctx interface{}) (*response.BorrowerGrowthStats, error)
-	getMarketStatsFn       func(ctx interface{}) (*response.MarketCreationStats, error)
-	getRevenueStatsFn      func(ctx interface{}) (*response.RevenueStats, error)
-	getLiquidationStatsFn  func(ctx interface{}) (*response.LiquidationStats, error)
-	getPositionStatsFn     func(ctx interface{}) (*response.PositionDistributionStats, error)
+	getOverviewFn         func(ctx interface{}) (*response.OverviewStats, error)
+	getBorrowerStatsFn    func(ctx interface{}) (*response.BorrowerGrowthStats, error)
+	getMarketStatsFn      func(ctx interface{}) (*response.MarketCreationStats, error)
+	getRevenueStatsFn     func(ctx interface{}) (*response.RevenueStats, error)
+	getLiquidationStatsFn func(ctx interface{}) (*response.LiquidationStats, error)
+	getPositionStatsFn    func(ctx interface{}) (*response.PositionDistributionStats, error)
 }
 
 /*

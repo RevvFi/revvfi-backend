@@ -23,6 +23,8 @@ import (
 	"github.com/Revvfi/revvfi-backend/internal/core/transaction"
 	"github.com/Revvfi/revvfi-backend/internal/core/withdrawal"
 	"github.com/Revvfi/revvfi-backend/internal/repository/postgres"
+	"github.com/Revvfi/revvfi-backend/internal/logger"
+	"github.com/Revvfi/revvfi-backend/middleware"
 
 )
 
@@ -44,14 +46,31 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
+	// Initialize structured logger FIRST
+	env := logger.EnvDevelopment
+	if cfg.Environment == "production" {
+		env = logger.EnvProduction
+	} else if cfg.Environment == "staging" {
+		env = logger.EnvStaging
+	}
+	logger.Init(logger.ServiceBackend, env)
+	logger.Info("RevvFi API server starting",
+		"environment", env,
+		"version", "1.0.0",
+	)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	db, err := postgres.Open(ctx, cfg.Database)
 	if err != nil {
+		logger.Error("Failed to open database",
+			logger.WithError(err),
+		)
 		log.Fatalf("open database: %v", err)
 	}
 	defer db.Close()
+	logger.Info("Database connection established")
 
 	jwtMgr, err := auth.NewJWTManager(cfg.JWT.Secret, cfg.JWT.TTL, cfg.JWT.Issuer)
 	if err != nil {
@@ -149,6 +168,16 @@ func main() {
 	Includes auth, market, admin, offer, position, borrower, liquidation, withdrawal, and transaction handlers.
 	*/
 	router := gin.New()
+
+	// Add structured logging middleware
+	router.Use(middleware.CorrelationID())
+	router.Use(middleware.RequestLogger())
+	router.Use(gin.Recovery()) // Panic recovery
+
+	logger.Info("HTTP middleware configured",
+		"middleware", []string{"CorrelationID", "RequestLogger", "Recovery"},
+	)
+
 	routes.Register(router, cfg, authService, adminAuthService, routes.Handlers{
 		/*
 		@handler Auth
@@ -277,8 +306,14 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("revvfi api listening on %s", server.Addr)
+		logger.Info("HTTP server starting",
+			"address", server.Addr,
+			"environment", env,
+		)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("HTTP server failed",
+				logger.WithError(err),
+			)
 			log.Fatalf("api server failed: %v", err)
 		}
 	}()
@@ -286,6 +321,19 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	<-stop
+
+	logger.Info("Shutdown signal received, gracefully shutting down...")
+
+	ctx, cancel = context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Error("Server shutdown failed",
+			logger.WithError(err),
+		)
+	} else {
+		logger.Info("Server shutdown complete")
+	}
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
 	defer shutdownCancel()

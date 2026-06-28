@@ -6,10 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"encoding/json"
+
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"encoding/json"
 
 	"github.com/Revvfi/revvfi-backend/internal/api/dto/response"
 )
@@ -29,11 +30,11 @@ Tests all five endpoints covering success paths, pagination, and service errors.
 Mock implementation of AdminAuditServiceInterface for handler testing.
 */
 type mockAdminAuditService struct {
-	getAuditLogsFn      func(ctx interface{}, page, limit int32, adminAddr, action, targetType string) (*response.AuditLogListResponse, error)
-	getAuditStatsFn     func(ctx interface{}) (*response.AuditStats, error)
-	exportAuditLogsFn   func(ctx interface{}, fromUnix, toUnix int64, format string) (*response.AuditExportResponse, error)
-	getAdminActivityFn  func(ctx interface{}, adminAddr string) (*response.AuditLogListResponse, error)
-	getActionHistoryFn  func(ctx interface{}, action string) (*response.AuditLogListResponse, error)
+	getAuditLogsFn     func(ctx interface{}, page, limit int32, adminAddr, action, targetType string) (*response.AuditLogListResponse, error)
+	getAuditStatsFn    func(ctx interface{}) (*response.AuditStats, error)
+	exportAuditLogsFn  func(ctx interface{}, fromUnix, toUnix int64, format string) (*response.AuditExportResponse, error)
+	getAdminActivityFn func(ctx interface{}, adminAddr string) (*response.AuditLogListResponse, error)
+	getActionHistoryFn func(ctx interface{}, action string) (*response.AuditLogListResponse, error)
 }
 
 /*

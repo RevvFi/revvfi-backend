@@ -124,27 +124,29 @@ CreateMarketRequest DTO containing:
 
 @response
 Success (201 Created):
-{
-  "success": true,
-  "data": {
-    "market_address": "0x...",
-    "borrower": "0x...",
-    "borrow_asset": "0x...",
-    "collateral_asset": "0x...",
-    "min_collateral_ratio": 11000,
-    "liquidation_threshold": 9500,
-    "created_at": "2026-05-30T12:00:00Z"
-  }
-}
+
+	{
+	  "success": true,
+	  "data": {
+	    "market_address": "0x...",
+	    "borrower": "0x...",
+	    "borrow_asset": "0x...",
+	    "collateral_asset": "0x...",
+	    "min_collateral_ratio": 11000,
+	    "liquidation_threshold": 9500,
+	    "created_at": "2026-05-30T12:00:00Z"
+	  }
+	}
 
 Error (400/422):
-{
-  "success": false,
-  "error": {
-    "code": "INVALID_MARKET_CONFIG",
-    "message": "collateral ratio must be >= 100%"
-  }
-}
+
+	{
+	  "success": false,
+	  "error": {
+	    "code": "INVALID_MARKET_CONFIG",
+	    "message": "collateral ratio must be >= 100%"
+	  }
+	}
 
 @error_cases
 - ErrInvalidInput: malformed request
@@ -154,17 +156,18 @@ Error (400/422):
 */
 func (h *AdminHandler) CreateMarket(c *gin.Context) {
 	ctx := c.Request.Context()
+	ctx = c.Request.Context()
 
 	/*
-	@logic ParseRequest
-	
-	@desc
-	Parse JSON request body into CreateMarketRequest DTO.
-	Gin automatically validates struct tags (eth_addr, numeric bounds).
-	
-	@notes
-	- Validates format but not business logic
-	- Business validation happens in service layer
+		@logic ParseRequest
+
+		@desc
+		Parse JSON request body into CreateMarketRequest DTO.
+		Gin automatically validates struct tags (eth_addr, numeric bounds).
+
+		@notes
+		- Validates format but not business logic
+		- Business validation happens in service layer
 	*/
 	var req request.CreateMarketRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -179,16 +182,16 @@ func (h *AdminHandler) CreateMarket(c *gin.Context) {
 	}
 
 	/*
-	@logic ExtractBorrower
-	
-	@desc
-	Extract borrower wallet address from authentication context.
-	Borrower MUST come from SIWE auth middleware (wallet verification).
-	NOT from request body for security reasons.
-	
-	@notes
-	- Middleware should set "wallet_address" in context
-	- We trust middleware to validate wallet signature
+		@logic ExtractBorrower
+
+		@desc
+		Extract borrower wallet address from authentication context.
+		Borrower MUST come from SIWE auth middleware (wallet verification).
+		NOT from request body for security reasons.
+
+		@notes
+		- Middleware should set "wallet_address" in context
+		- We trust middleware to validate wallet signature
 	*/
 	borrowerInterface, exists := c.Get("wallet_address")
 	if !exists {
@@ -204,11 +207,11 @@ func (h *AdminHandler) CreateMarket(c *gin.Context) {
 	borrower := borrowerInterface.(string)
 
 	/*
-	@logic ValidateRequest
-	
-	@desc
-	Call service layer validation to enforce protocol constraints.
-	This is the business logic validation layer that ensures protocol safety.
+		@logic ValidateRequest
+
+		@desc
+		Call service layer validation to enforce protocol constraints.
+		This is the business logic validation layer that ensures protocol safety.
 	*/
 	if err := h.marketValidator.ValidateMarketCreation(
 		borrower,
@@ -229,35 +232,35 @@ func (h *AdminHandler) CreateMarket(c *gin.Context) {
 	}
 
 	/*
-	@logic GenerateMarketAddress
-	
-	@desc
-	Generate deterministic market address for new market.
-	In production: derive from factory contract or use Ethereum address generation.
-	In this stub: simple hash-based generation for testing.
-	
-	@notes
-	- Market address should be deterministic (same inputs = same address)
-	- Should avoid collisions (use factory contract in production)
+		@logic GenerateMarketAddress
+
+		@desc
+		Generate deterministic market address for new market.
+		In production: derive from factory contract or use Ethereum address generation.
+		In this stub: simple hash-based generation for testing.
+
+		@notes
+		- Market address should be deterministic (same inputs = same address)
+		- Should avoid collisions (use factory contract in production)
 	*/
 	marketAddress := fmt.Sprintf("0xmarket%s%s", borrower[:8], req.BorrowAsset[:8])
 
 	/*
-	@logic CallServiceLayer
-	
-	@desc
-	Call market service to create market with validated parameters.
-	Service layer handles all business logic and persistence.
-	
-	@params
-	- ctx: request context
-	- marketAddress: deterministic market address
-	- borrower: from auth context (trusted)
-	- borrowAsset: from request
-	- collateralAsset: from request
-	- collateralOracle: from request (Chainlink oracle)
-	- minCollateralRatio: from request
-	- liquidationThreshold: from request
+		@logic CallServiceLayer
+
+		@desc
+		Call market service to create market with validated parameters.
+		Service layer handles all business logic and persistence.
+
+		@params
+		- ctx: request context
+		- marketAddress: deterministic market address
+		- borrower: from auth context (trusted)
+		- borrowAsset: from request
+		- collateralAsset: from request
+		- collateralOracle: from request (Chainlink oracle)
+		- minCollateralRatio: from request
+		- liquidationThreshold: from request
 	*/
 	market, err := h.marketService.CreateMarket(
 		ctx,
@@ -282,11 +285,11 @@ func (h *AdminHandler) CreateMarket(c *gin.Context) {
 	}
 
 	/*
-	@logic MapResponseDTO
-	
-	@desc
-	Convert domain model to response DTO.
-	This ensures API contract remains stable even if domain models change.
+		@logic MapResponseDTO
+
+		@desc
+		Convert domain model to response DTO.
+		This ensures API contract remains stable even if domain models change.
 	*/
 	resp := response.MarketResponse{
 		Address:         market.Address,
@@ -325,30 +328,32 @@ GET /api/admin/markets/:address
 
 @response
 Success (200 OK):
-{
-  "success": true,
-  "data": {
-    "market_address": "0x...",
-    "borrower": "0x...",
-    "borrow_asset": "0x...",
-    "collateral_asset": "0x...",
-    "min_collateral_ratio": 11000,
-    "liquidation_threshold": 9500,
-    "total_principal": "1000000000000000000",
-    "total_interest": "50000000000000000",
-    "is_active": true,
-    "created_at": 1685356800
-  }
-}
+
+	{
+	  "success": true,
+	  "data": {
+	    "market_address": "0x...",
+	    "borrower": "0x...",
+	    "borrow_asset": "0x...",
+	    "collateral_asset": "0x...",
+	    "min_collateral_ratio": 11000,
+	    "liquidation_threshold": 9500,
+	    "total_principal": "1000000000000000000",
+	    "total_interest": "50000000000000000",
+	    "is_active": true,
+	    "created_at": 1685356800
+	  }
+	}
 
 Error (404):
-{
-  "success": false,
-  "error": {
-    "code": "MARKET_NOT_FOUND",
-    "message": "market not found"
-  }
-}
+
+	{
+	  "success": false,
+	  "error": {
+	    "code": "MARKET_NOT_FOUND",
+	    "message": "market not found"
+	  }
+	}
 
 @error_cases
 - ErrMarketNotFound: market address not found in database
@@ -356,22 +361,23 @@ Error (404):
 */
 func (h *AdminHandler) GetMarket(c *gin.Context) {
 	ctx := c.Request.Context()
+	ctx = c.Request.Context()
 
 	/*
-	@logic ExtractPathParam
-	
-	@desc
-	Extract market address from URL path parameter.
-	Path parameters are automatically URL-decoded by Gin.
+		@logic ExtractPathParam
+
+		@desc
+		Extract market address from URL path parameter.
+		Path parameters are automatically URL-decoded by Gin.
 	*/
 	marketAddress := c.Param("address")
 
 	/*
-	@logic ValidateAddressFormat
-	
-	@desc
-	Quick format validation of market address.
-	Full validation happens in service layer.
+		@logic ValidateAddressFormat
+
+		@desc
+		Quick format validation of market address.
+		Full validation happens in service layer.
 	*/
 	if marketAddress == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -385,11 +391,11 @@ func (h *AdminHandler) GetMarket(c *gin.Context) {
 	}
 
 	/*
-	@logic CallServiceLayer
-	
-	@desc
-	Call market service to fetch market details.
-	Service applies business logic validation.
+		@logic CallServiceLayer
+
+		@desc
+		Call market service to fetch market details.
+		Service applies business logic validation.
 	*/
 	mkt, err := h.marketService.GetMarket(ctx, marketAddress)
 	if err != nil {
@@ -405,10 +411,10 @@ func (h *AdminHandler) GetMarket(c *gin.Context) {
 	}
 
 	/*
-	@logic MapResponseDTO
-	
-	@desc
-	Map domain model to response DTO, including computed metrics.
+		@logic MapResponseDTO
+
+		@desc
+		Map domain model to response DTO, including computed metrics.
 	*/
 	resp := response.MarketResponse{
 		Address:         mkt.Address,
@@ -449,26 +455,27 @@ GET /api/admin/markets?page=1&limit=20&active=true
 
 @response
 Success (200 OK):
-{
-  "success": true,
-  "data": {
-    "markets": [
-      {
-        "market_address": "0x...",
-        "borrower": "0x...",
-        "borrow_asset": "0x...",
-        "collateral_asset": "0x...",
-        "is_active": true,
-        "created_at": 1685356800
-      }
-    ],
-    "pagination": {
-      "page": 1,
-      "limit": 20,
-      "total": 45
-    }
-  }
-}
+
+	{
+	  "success": true,
+	  "data": {
+	    "markets": [
+	      {
+	        "market_address": "0x...",
+	        "borrower": "0x...",
+	        "borrow_asset": "0x...",
+	        "collateral_asset": "0x...",
+	        "is_active": true,
+	        "created_at": 1685356800
+	      }
+	    ],
+	    "pagination": {
+	      "page": 1,
+	      "limit": 20,
+	      "total": 45
+	    }
+	  }
+	}
 
 @error_cases
 - Invalid pagination parameters
@@ -476,23 +483,24 @@ Success (200 OK):
 */
 func (h *AdminHandler) ListMarkets(c *gin.Context) {
 	ctx := c.Request.Context()
+	ctx = c.Request.Context()
 
 	/*
-	@logic ExtractQueryParams
-	
-	@desc
-	Extract and validate pagination query parameters from request.
-	Query parameters are strings and must be converted to integers.
+		@logic ExtractQueryParams
+
+		@desc
+		Extract and validate pagination query parameters from request.
+		Query parameters are strings and must be converted to integers.
 	*/
 	pageStr := c.DefaultQuery("page", "1")
 	limitStr := c.DefaultQuery("limit", "20")
 
 	/*
-	@logic ParseAndValidatePagination
-	
-	@desc
-	Parse pagination parameters with validation and bounds checking.
-	Prevents invalid queries from reaching database layer.
+		@logic ParseAndValidatePagination
+
+		@desc
+		Parse pagination parameters with validation and bounds checking.
+		Prevents invalid queries from reaching database layer.
 	*/
 	page, err := strconv.ParseInt(pageStr, 10, 32)
 	if err != nil || page < 1 {
@@ -519,20 +527,20 @@ func (h *AdminHandler) ListMarkets(c *gin.Context) {
 	}
 
 	/*
-	@logic CalculateOffset
-	
-	@desc
-	Calculate database offset from page number.
-	Offset = (page - 1) * limit
+		@logic CalculateOffset
+
+		@desc
+		Calculate database offset from page number.
+		Offset = (page - 1) * limit
 	*/
 	offset := (page - 1) * limit
 
 	/*
-	@logic CallServiceLayer
-	
-	@desc
-	Call market service with pagination parameters.
-	Service layer handles database query and result mapping.
+		@logic CallServiceLayer
+
+		@desc
+		Call market service with pagination parameters.
+		Service layer handles database query and result mapping.
 	*/
 	markets, err := h.marketService.ListMarkets(
 		ctx,
@@ -552,10 +560,10 @@ func (h *AdminHandler) ListMarkets(c *gin.Context) {
 	}
 
 	/*
-	@logic MapResponses
-	
-	@desc
-	Map domain models to response DTOs for API contract.
+		@logic MapResponses
+
+		@desc
+		Map domain models to response DTOs for API contract.
 	*/
 	var resp []response.MarketResponse
 	for _, mkt := range markets {
@@ -603,19 +611,20 @@ GET /api/admin/markets/:address/metrics
 
 @response
 Success (200 OK):
-{
-  "success": true,
-  "data": {
-    "market_address": "0x...",
-    "utilization_rate": 0.65,
-    "average_apr": 500,
-    "total_value_locked": "5000000000000000000",
-    "total_interest": "150000000000000000",
-    "active_positions": 42,
-    "active_offers": 12,
-    "status": "healthy"
-  }
-}
+
+	{
+	  "success": true,
+	  "data": {
+	    "market_address": "0x...",
+	    "utilization_rate": 0.65,
+	    "average_apr": 500,
+	    "total_value_locked": "5000000000000000000",
+	    "total_interest": "150000000000000000",
+	    "active_positions": 42,
+	    "active_offers": 12,
+	    "status": "healthy"
+	  }
+	}
 
 @error_cases
 - ErrMarketNotFound: market not found
@@ -623,12 +632,13 @@ Success (200 OK):
 */
 func (h *AdminHandler) GetMarketMetrics(c *gin.Context) {
 	ctx := c.Request.Context()
+	ctx = c.Request.Context()
 
 	/*
-	@logic ExtractPathParam
-	
-	@desc
-	Extract market address from URL path.
+		@logic ExtractPathParam
+
+		@desc
+		Extract market address from URL path.
 	*/
 	marketAddress := c.Param("address")
 
@@ -644,11 +654,11 @@ func (h *AdminHandler) GetMarketMetrics(c *gin.Context) {
 	}
 
 	/*
-	@logic GetMarketData
-	
-	@desc
-	Fetch market from service first.
-	CalculateMetrics requires *models.Market, not just address string.
+		@logic GetMarketData
+
+		@desc
+		Fetch market from service first.
+		CalculateMetrics requires *models.Market, not just address string.
 	*/
 	market, err := h.marketService.GetMarket(ctx, marketAddress)
 	if err != nil {
@@ -664,11 +674,11 @@ func (h *AdminHandler) GetMarketMetrics(c *gin.Context) {
 	}
 
 	/*
-	@logic CallServiceLayer
-	
-	@desc
-	Call market service to calculate metrics.
-	Service performs all calculations and validation.
+		@logic CallServiceLayer
+
+		@desc
+		Call market service to calculate metrics.
+		Service performs all calculations and validation.
 	*/
 	metrics, err := h.marketService.CalculateMetrics(ctx, market)
 	if err != nil {
@@ -684,11 +694,11 @@ func (h *AdminHandler) GetMarketMetrics(c *gin.Context) {
 	}
 
 	/*
-	@logic MapResponseDTO
-	
-	@desc
-	Convert metrics to response format with proper data types.
-	Extract relevant metrics from the metrics map returned by service.
+		@logic MapResponseDTO
+
+		@desc
+		Convert metrics to response format with proper data types.
+		Extract relevant metrics from the metrics map returned by service.
 	*/
 	activePositions := int32(0)
 	if ap, ok := metrics["active_positions"]; ok {
@@ -734,22 +744,24 @@ PATCH /api/admin/markets/:address/status
 - address: market contract address
 
 @request
-{
-  "is_active": true,
-  "is_liquidating": false
-}
+
+	{
+	  "is_active": true,
+	  "is_liquidating": false
+	}
 
 @response
 Success (200 OK):
-{
-  "success": true,
-  "data": {
-    "market_address": "0x...",
-    "is_active": true,
-    "is_liquidating": false,
-    "updated_at": 1685356800
-  }
-}
+
+	{
+	  "success": true,
+	  "data": {
+	    "market_address": "0x...",
+	    "is_active": true,
+	    "is_liquidating": false,
+	    "updated_at": 1685356800
+	  }
+	}
 
 @error_cases
 - ErrMarketNotFound: market not found
@@ -757,12 +769,13 @@ Success (200 OK):
 */
 func (h *AdminHandler) UpdateMarketStatus(c *gin.Context) {
 	ctx := c.Request.Context()
+	ctx = c.Request.Context()
 
 	/*
-	@logic ExtractPathParam
-	
-	@desc
-	Extract market address from URL path.
+		@logic ExtractPathParam
+
+		@desc
+		Extract market address from URL path.
 	*/
 	marketAddress := c.Param("address")
 
@@ -778,13 +791,13 @@ func (h *AdminHandler) UpdateMarketStatus(c *gin.Context) {
 	}
 
 	/*
-	@logic ParseRequestBody
-	
-	@desc
-	Parse status update request from JSON body.
+		@logic ParseRequestBody
+
+		@desc
+		Parse status update request from JSON body.
 	*/
 	var req struct {
-		IsActive     *bool `json:"is_active"`
+		IsActive      *bool `json:"is_active"`
 		IsLiquidating *bool `json:"is_liquidating"`
 	}
 
@@ -800,11 +813,11 @@ func (h *AdminHandler) UpdateMarketStatus(c *gin.Context) {
 	}
 
 	/*
-	@logic FetchCurrentMarket
-	
-	@desc
-	Get current market state to apply updates.
-	Only update provided fields (patch semantics).
+		@logic FetchCurrentMarket
+
+		@desc
+		Get current market state to apply updates.
+		Only update provided fields (patch semantics).
 	*/
 	mkt, err := h.marketService.GetMarket(ctx, marketAddress)
 	if err != nil {
@@ -820,11 +833,11 @@ func (h *AdminHandler) UpdateMarketStatus(c *gin.Context) {
 	}
 
 	/*
-	@logic ApplyUpdates
-	
-	@desc
-	Apply partial updates to market model.
-	Only modify fields that were provided in request (nil checks).
+		@logic ApplyUpdates
+
+		@desc
+		Apply partial updates to market model.
+		Only modify fields that were provided in request (nil checks).
 	*/
 	if req.IsActive != nil {
 		mkt.IsActive = *req.IsActive
@@ -834,20 +847,20 @@ func (h *AdminHandler) UpdateMarketStatus(c *gin.Context) {
 	}
 
 	/*
-	@logic PersistChanges
-	
-	@desc
-	Persist updated market to database.
-	This is a simplified example - real implementation would use repository.
+		@logic PersistChanges
+
+		@desc
+		Persist updated market to database.
+		This is a simplified example - real implementation would use repository.
 	*/
 	// In a real implementation, we would call repository to update
 	// For now, we'll return success with updated values
 
 	resp := gin.H{
-		"market_address":    mkt.Address,
-		"is_active":        mkt.IsActive,
-		"is_liquidating":   mkt.IsLiquidating,
-		"updated_at":       mkt.LastInterestAccrual.Unix(),
+		"market_address": mkt.Address,
+		"is_active":      mkt.IsActive,
+		"is_liquidating": mkt.IsLiquidating,
+		"updated_at":     mkt.LastInterestAccrual.Unix(),
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -868,16 +881,17 @@ GET /api/admin/health
 
 @response
 Success (200 OK):
-{
-  "success": true,
-  "data": {
-    "status": "healthy",
-    "total_markets": 15,
-    "total_tvl": "10000000000000000000",
-    "active_positions": 250,
-    "timestamp": 1685356800
-  }
-}
+
+	{
+	  "success": true,
+	  "data": {
+	    "status": "healthy",
+	    "total_markets": 15,
+	    "total_tvl": "10000000000000000000",
+	    "active_positions": 250,
+	    "timestamp": 1685356800
+	  }
+	}
 
 @error_cases
 - Database connection issues
@@ -885,11 +899,11 @@ Success (200 OK):
 */
 func (h *AdminHandler) HealthCheck(c *gin.Context) {
 	/*
-	@logic QuerySystemMetrics
-	
-	@desc
-	Gather high-level system metrics for health status.
-	This is a simplified example - real implementation would aggregate data.
+		@logic QuerySystemMetrics
+
+		@desc
+		Gather high-level system metrics for health status.
+		This is a simplified example - real implementation would aggregate data.
 	*/
 	// In a real implementation, we would call repository methods to fetch:
 	// - Total market count
