@@ -182,15 +182,28 @@ Loads application configuration from environment variables with development-safe
 - error
 */
 func Load() (*Config, error) {
+	// Load base .env first
 	if err := loadDotEnvUpward(".env"); err != nil {
 		return nil, err
 	}
-	if err := loadDotEnvUpward(".env.local"); err != nil {
-		return nil, err
+
+	// Check ENVIRONMENT to determine which env file to load
+	env := getEnv("ENVIRONMENT", "development")
+
+	// Load environment-specific config
+	if env == "production" {
+		if err := loadDotEnvUpward(".env.production"); err != nil {
+			return nil, err
+		}
+	} else {
+		// Load .env.local for local development
+		if err := loadDotEnvUpward(".env.local"); err != nil {
+			return nil, err
+		}
 	}
 
 	cfg := &Config{
-		Environment: getEnv("ENVIRONMENT", "development"),
+		Environment: env,
 		Server: ServerConfig{
 			Host:            getEnv("API_HOST", "0.0.0.0"),
 			Port:            getEnv("API_PORT", "3000"),
