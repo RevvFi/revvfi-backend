@@ -35,6 +35,10 @@ func CORS(origins []string, methods []string, headers []string) gin.HandlerFunc 
 		}
 		allowed[origin] = struct{}{}
 	}
+	// Precomputed once at middleware construction instead of on every
+	// request - the joined value never changes after setup.
+	allowedMethods := strings.Join(methods, ", ")
+	allowedHeaders := strings.Join(headers, ", ")
 
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
@@ -45,8 +49,8 @@ func CORS(origins []string, methods []string, headers []string) gin.HandlerFunc 
 			c.Header("Vary", "Origin")
 		}
 
-		c.Header("Access-Control-Allow-Methods", strings.Join(methods, ", "))
-		c.Header("Access-Control-Allow-Headers", strings.Join(headers, ", "))
+		c.Header("Access-Control-Allow-Methods", allowedMethods)
+		c.Header("Access-Control-Allow-Headers", allowedHeaders)
 		c.Header("Access-Control-Allow-Credentials", "true")
 
 		if c.Request.Method == http.MethodOptions {

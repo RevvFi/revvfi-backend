@@ -45,6 +45,28 @@ func RateLimit(maxRequests int, window time.Duration) gin.HandlerFunc {
 	var mu sync.Mutex
 	buckets := make(map[string]*rateBucket)
 
+	// Buckets are only ever added, never removed, so a long-lived process
+	// accumulates one entry per distinct client IP forever. Periodically
+	// drop entries whose window has already expired - they'd be replaced on
+	// next access anyway (see the now.After(bucket.resetAt) check below),
+	// so this only reclaims memory and never changes a limiting decision.
+	if maxRequests > 0 && window > 0 {
+		go func() {
+			ticker := time.NewTicker(window)
+			defer ticker.Stop()
+			for range ticker.C {
+				cutoff := time.Now()
+				mu.Lock()
+				for ip, bucket := range buckets {
+					if cutoff.After(bucket.resetAt) {
+						delete(buckets, ip)
+					}
+				}
+				mu.Unlock()
+			}
+		}()
+	}
+
 	return func(c *gin.Context) {
 		if maxRequests <= 0 {
 			c.Next()
