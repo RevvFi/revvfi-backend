@@ -16,8 +16,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 /*
@@ -33,9 +31,6 @@ const (
 	
 	// SIWE version
 	siweVersion = "1"
-	
-	// Default chain ID for RevvFi (Ethereum Mainnet)
-	defaultChainID = 1
 )
 
 /*
@@ -331,111 +326,6 @@ func validateURI(uri string) error {
 	}
 	
 	return nil
-}
-
-/*
-@function VerifySIWESignature
-
-@desc
-Verifies SIWE signature using EIP-191 standard.
-Includes v value validation and full field verification.
-
-@params
-- message: Original SIWE message string
-- signature: Hex-encoded signature
-- expectedAddress: Expected Ethereum address
-- expectedNonce: Expected nonce from database (for validation)
-
-@returns
-- *SIWEMessage: Parsed and validated message
-- error: Error if verification fails
-*/
-func VerifySIWESignature(message, signature, expectedAddress, expectedNonce string) (*SIWEMessage, error) {
-	/*
-	@step 1: Parse and validate SIWE message
-	*/
-	siweMsg, err := ParseSIWEMessage(message)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse SIWE message: %w", err)
-	}
-	
-	/*
-	@step 2: Verify domain matches expected
-	*/
-	// Expected domain should be from config (e.g., "revvfi.com")
-	// For now, validate format - actual domain check should be in service layer
-	
-	/*
-	@step 3: Verify chain ID matches expected
-	*/
-	if siweMsg.ChainID != int64(defaultChainID) {
-		return nil, fmt.Errorf("%w: expected %d, got %d", ErrInvalidChainID, defaultChainID, siweMsg.ChainID)
-	}
-	
-	/*
-	@step 4: Verify nonce matches stored value
-	*/
-	if siweMsg.Nonce != expectedNonce {
-		return nil, fmt.Errorf("%w: expected %s, got %s", ErrInvalidNonce, expectedNonce, siweMsg.Nonce)
-	}
-	
-	/*
-	@step 5: Verify address matches
-	*/
-	if !strings.EqualFold(siweMsg.Address, expectedAddress) {
-		return nil, fmt.Errorf("%w: expected %s, got %s", ErrAddressMismatch, expectedAddress, siweMsg.Address)
-	}
-	
-	/*
-	@step 6: Verify signature
-	*/
-	sigBytes, err := hexutil.Decode(signature)
-	if err != nil {
-		return nil, fmt.Errorf("%w: failed to decode signature: %v", ErrInvalidSignature, err)
-	}
-	
-	// Validate signature length (65 bytes)
-	if len(sigBytes) != 65 {
-		return nil, fmt.Errorf("%w: invalid signature length %d", ErrInvalidSignature, len(sigBytes))
-	}
-	
-	// Validate and normalize recovery ID (v value)
-	v := sigBytes[64]
-	if v < minValidV || v > maxValidV {
-		return nil, fmt.Errorf("%w: v value %d out of range", ErrInvalidVValue, v)
-	}
-	
-	// Convert v from 27/28 to 0/1 for secp256k1 recovery
-	if v == 27 || v == 28 {
-		sigBytes[64] = v - 27
-	}
-	
-	/*
-	@step 7: Hash message with EIP-191 personal_sign prefix
-	*/
-	msgLen := len(message)
-	msgLenStr := strconv.Itoa(msgLen)
-	personalMsg := []byte(personalSignPrefix + msgLenStr + message)
-	msgHash := crypto.Keccak256Hash(personalMsg)
-	
-	/*
-	@step 8: Recover public key using crypto.SigToPub (recommended)
-	*/
-	pubKey, err := crypto.SigToPub(msgHash.Bytes(), sigBytes)
-	if err != nil {
-		return nil, fmt.Errorf("%w: failed to recover public key: %v", ErrInvalidSignature, err)
-	}
-	
-	/*
-	@step 9: Convert to address and compare
-	*/
-	recoveredAddress := crypto.PubkeyToAddress(*pubKey)
-	
-	if !strings.EqualFold(recoveredAddress.Hex(), expectedAddress) {
-		return nil, fmt.Errorf("%w: recovered %s, expected %s", ErrAddressMismatch, recoveredAddress.Hex(), expectedAddress)
-	}
-	
-	return siweMsg, nil
 }
 
 /*
