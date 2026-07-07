@@ -57,7 +57,7 @@ func (h *RepayHandler) handleRepay(ctx context.Context, event *types.RepayEvent,
 		repaymentType = "full"
 	}
 	repayment := &models.Repayment{
-		MarketAddress:   "", // Would need to get from context
+		MarketAddress:   event.Market.Hex(),
 		BorrowerAddress: event.Borrower.Hex(),
 		Amount:          event.Amount,
 		InterestPaid:    event.InterestPaid,
@@ -71,7 +71,5 @@ func (h *RepayHandler) handleRepay(ctx context.Context, event *types.RepayEvent,
 		return err
 	}
 
-	// Note: TotalDebt is no longer in RepayEvent (not emitted by contract)
-	// Market debt tracking should be calculated from Borrow and Repay amounts
-	return nil
+	return h.eventRepo.DecrementMarketDebt(ctx, event.Market.Hex(), event.Amount, event.PrincipalPaid)
 }

@@ -69,8 +69,9 @@ func TestCalculateAccruedInterest(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 pos := &models.Position{
-				Principal: tc.principal,
-				APR:       tc.apr,
+				Principal:        tc.principal,
+				CurrentPrincipal: tc.principal,
+				APR:              tc.apr,
 			}
 
 			interest := valuator.CalculateAccruedInterest(pos, tc.secondsElapsed, 0)

@@ -64,7 +64,7 @@ func NewRegistry(
 	// ============================================
 	r.Register("Borrow", NewBorrowHandler(eventRepo))
 	r.Register("Repay", NewRepayHandler(eventRepo))
-	r.Register("InterestAccrued", NewInterestHandler(eventRepo))
+	r.Register("LenderRepaid", NewPositionHandler(eventRepo))
 	r.Register("CollateralDeposited", NewCollateralHandler(eventRepo))
 	r.Register("CollateralWithdrawn", NewCollateralHandler(eventRepo))
 	r.Register("CollateralLiquidated", NewCollateralHandler(eventRepo))

@@ -51,28 +51,35 @@ func NewLiquidationHandler(eventRepo *postgres.EventRepository) *LiquidationHand
 
 /*@
  * Handle
- * @desc Processes LiquidationExecuted event
+ * @desc Processes LiquidationExecuted, LiquidationStartedMarket, and
+ *       LiquidationEndedMarket events
  * @param ctx Context for cancellation and deadlines
  * @param event The decoded event from blockchain
  * @param blockNum Block number where event occurred
  * @returns error if handling fails
  *
  * @state_changes
- *   - Marks borrower's positions as liquidated
- *   - Updates borrower reputation (default recorded)
- *   - Records liquidation in history
- *   - Updates market debt totals
+ *   - LiquidationExecuted: marks borrower's positions as liquidated,
+ *     updates reputation, records liquidation history, updates market debt
+ *   - LiquidationStartedMarket/LiquidationEndedMarket: flips the market's
+ *     is_liquidating flag - this was previously registered to this handler
+ *     but silently dropped (the type switch below didn't have cases for
+ *     them), so markets.is_liquidating never reflected real liquidation
+ *     state. That let the frontend keep offering "Trigger Liquidation" on
+ *     a market that was already mid-auction, guaranteeing a revert for
+ *     the second caller.
  */
 func (h *LiquidationHandler) Handle(ctx context.Context, event interface{}, blockNum uint64) error {
-	e, ok := event.(*types.LiquidationExecutedEvent)
-	if !ok {
+	switch e := event.(type) {
+	case *types.LiquidationExecutedEvent:
+		log.Printf(" LiquidationExecuted: Borrower=%s, DebtAmount=%s, CollateralSeized=%s",
+			e.Borrower.Hex(), e.DebtAmount.String(), e.CollateralAmount.String())
+		return h.eventRepo.RecordLiquidation(ctx, e.Borrower.Hex(), e.DebtAmount, e.CollateralAmount, blockNum)
+	case *types.LiquidationStartedMarketEvent:
+		return h.eventRepo.UpdateMarketLiquidating(ctx, e.Market.Hex(), true)
+	case *types.LiquidationEndedMarketEvent:
+		return h.eventRepo.UpdateMarketLiquidating(ctx, e.Market.Hex(), false)
+	default:
 		return nil
 	}
-
-	log.Printf(" LiquidationExecuted: Borrower=%s, DebtAmount=%s, CollateralSeized=%s",
-		e.Borrower.Hex(), e.DebtAmount.String(), e.CollateralAmount.String())
-
-	// Record liquidation in database
-	// This affects borrower reputation and market health metrics
-	return h.eventRepo.RecordLiquidation(ctx, e.Borrower.Hex(), e.DebtAmount, e.CollateralAmount, blockNum)
 }

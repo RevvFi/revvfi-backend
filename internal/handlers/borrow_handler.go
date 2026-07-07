@@ -58,8 +58,13 @@ func (h *BorrowHandler) handleBorrow(ctx context.Context, event *types.BorrowEve
 		"weighted_apr", event.WeightedAPR,
 	)
 
-	// Update market total debt
-	// TODO: Add actual database update logic here
+	if err := h.eventRepo.IncrementMarketDebt(ctx, event.Market.Hex(), event.Amount); err != nil {
+		logger.ErrorContext(ctx, "Failed to update market debt after borrow",
+			logger.WithError(err),
+			logger.WithBorrower(event.Borrower.Hex()),
+		)
+		return err
+	}
 
 	logger.InfoContext(ctx, "Borrow event processed successfully",
 		logger.WithBorrower(event.Borrower.Hex()),

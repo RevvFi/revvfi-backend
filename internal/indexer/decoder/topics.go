@@ -23,15 +23,16 @@ var EventTopics = map[string]string{
 	"ContractsSet":             "0xeaedf84a54115aef3214ad296d4e9d465ef83830625852a51d892bb830100c40",
 	"DrawdownExecuted":         "0xd6183328d9c97aa1695793c0f5cdfd9117f27e0c9ac65205c4c0eb031cc47f3d",
 	"GuardianUpdated":          "0x064d28d3d3071c5cbc271a261c10c2f0f0d9e319390397101aa0eb23c6bad909",
-	"InterestAccrued":          "0x5e804d42ae3b860f881d11cb44a4bb1f2f0d5b3d081f5539a32d6f97b629d978",
+	"LenderRepaid":             "0xf6fc540193542dc4bbf6bcf9707f55489c017b3094d765abf460a52a5780ebf2",
 	"LiquidationEndedMarket":   "0x445e027cfd2db85d19806ef8d31d4bdf988e15bd98e40d254519916e9f313079",
 	"LiquidationStartedMarket": "0x97ee3b9e4cd3242f1a9e7324336e978ed8d916c597cd0f6a3c8c5b65b93cad9b",
 	"MarketClosedEvent":        "0x09a09c46728dfde8eed179c677c1238c3dde7f0d264ed782135a43b23222e219",
+	"PositionClaimed":          "0xf18ca9717b47ea7629d17b5d7b2ede46e864155725629e7d0347924c2f6d112d",
 	"PositionSettled":          "0x78dd5e343bcb666bca386d600c40d1412bff3eb1772d8be0f416118a4cd5a9bd",
 	"Repay":                    "0x2fe77b1c99aca6b022b8efc6e3e8dd1b48b30748709339b65c50ef3263443e09",
 
 	// ============================================
-	// OFFERBOOK EVENTS (RevvFiOfferBook - 6 events)
+	// OFFERBOOK EVENTS (RevvFiOfferBook - 5 events)
 	// ============================================
 	"DrawdownExecutedOffer": "0x71bb7db5826ee7f4728165cba6e22dd34aee9a9b73be58e7ac6ea5be7609713f",
 	"OfferCancelled":        "0x1f51377b3e685a0e2419f9bb4ba7c07ec54936353ba3d0fb3c6538dab6766222",

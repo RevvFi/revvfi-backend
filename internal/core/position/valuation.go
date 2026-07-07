@@ -67,7 +67,10 @@ compoundingPeriod int64,
 		return big.NewInt(0)
 	}
 
-	principal := position.Principal
+	// CurrentPrincipal (not the original Principal) reflects any partial
+	// repayments already made - using the original amount would keep
+	// overstating interest on a position that's been partly paid down.
+	principal := position.CurrentPrincipal
 	apr := big.NewInt(int64(position.APR))
 
 	// Interest = Principal × APR × (Seconds / SecondsPerYear) / 10000

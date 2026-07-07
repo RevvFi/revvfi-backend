@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/Revvfi/revvfi-backend/internal/models"
 	appErr "github.com/Revvfi/revvfi-backend/internal/pkg/errors"
@@ -148,7 +149,41 @@ tokenID int64,
 		return nil, appErr.ErrPositionNotFound
 	}
 
+	s.applyLiveAccrual(position)
 	return position, nil
+}
+
+/*
+@function applyLiveAccrual
+
+@desc
+Computes AccruedInterest live (principal * own APR * elapsed time since
+last update), instead of leaving it frozen at whatever it was set to on
+creation. The stored value is only ever written once, at mint
+(PositionMinted handler), and never updated again while a position stays
+active - so without this, the Portfolio page would show "$0.0000 accrued"
+for the entire life of a loan no matter how much time passed, only
+becoming accurate once the position is fully settled/redeemed.
+
+Settled positions are left untouched: their AccruedInterest/ClaimableAmount
+already reflect the real final on-chain split (from the PositionSettled/
+PositionRedeemed events), and re-deriving from LastUpdated post-settlement
+would be wrong (the accrual clock stopped the moment it was repaid).
+
+ClaimableAmount is deliberately NOT touched here - on-chain, that only
+becomes non-zero once an actual repayment happens; showing a live-computed
+figure there for a still-active position would misrepresent what's
+actually available to withdraw right now.
+
+@params
+- position: position to update in place
+*/
+func (s *PositionService) applyLiveAccrual(position *models.Position) {
+	if !position.IsActive {
+		return
+	}
+	secondsElapsed := int64(time.Since(position.LastUpdated).Seconds())
+	position.AccruedInterest = s.valuator.CalculateAccruedInterest(position, secondsElapsed, 0)
 }
 
 /*
@@ -175,6 +210,10 @@ limit, offset int32,
 	positions, err := s.positionRepo.GetByLender(ctx, lender, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch positions: %w", err)
+	}
+
+	for i := range positions {
+		s.applyLiveAccrual(&positions[i])
 	}
 
 	return positions, nil
@@ -210,6 +249,7 @@ lender string,
 	settledCount := int32(0)
 
 	for _, pos := range positions {
+		s.applyLiveAccrual(&pos)
 		totalSupplied.Add(totalSupplied, pos.Principal)
 		// Calculate current value: Principal + Accrued Interest
 		currentValue := new(big.Int).Add(pos.CurrentPrincipal, pos.AccruedInterest)

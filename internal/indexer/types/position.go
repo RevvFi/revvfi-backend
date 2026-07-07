@@ -74,3 +74,23 @@ type PositionRedeemedEvent struct {
 	Principal *big.Int
 	Interest  *big.Int
 }
+
+/*@
+ * LenderRepaidEvent
+ * @desc Emitted per-position on a partial repayment (position stays active).
+ *       Full settlement instead goes through PositionSettled/PositionRedeemed.
+ * @contract RevvFiMarket
+ * @topics
+ *   - topics[0]: Event signature hash
+ *   - topics[1]: lender (indexed)
+ *   - topics[2]: positionId (indexed)
+ * @data
+ *   - bytes[0:32]: newPrincipal (uint256) - absolute remaining principal
+ *   - bytes[32:64]: claimableShare (uint256) - incremental amount credited this round
+ */
+type LenderRepaidEvent struct {
+	Lender         common.Address
+	PositionID     *big.Int
+	NewPrincipal   *big.Int
+	ClaimableShare *big.Int
+}

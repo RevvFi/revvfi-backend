@@ -3,6 +3,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"time"
 
@@ -25,7 +26,6 @@ import (
  *   - MarketDeployed: New lending market created
  *   - MarketPaused: Market emergency paused
  *   - MarketUnpaused: Market resumed
- *   - InterestAccrued: Interest accrued on market
  */
 type MarketHandler struct {
 	eventRepo        *postgres.EventRepository
@@ -69,8 +69,6 @@ func (h *MarketHandler) Handle(ctx context.Context, event interface{}, blockNum 
 		return h.handleMarketPaused(ctx, e, blockNum)
 	case *types.MarketUnpausedEvent:
 		return h.handleMarketUnpaused(ctx, e, blockNum)
-	case *types.InterestAccruedEvent:
-		return h.handleInterestAccrued(ctx, e, blockNum)
 	case *types.MarketClosedEvent:
 		return h.handleMarketClosed(ctx, e, blockNum)
 	}
@@ -95,23 +93,29 @@ func (h *MarketHandler) handleMarketDeployed(ctx context.Context, event *types.M
 		logger.WithCollateralAsset(event.CollateralAsset.Hex()),
 	)
 
-	// Fetch actual decimals from token contracts
+	// Fetch actual decimals and symbol from token contracts
 	borrowDecimals := h.getTokenDecimals(ctx, event.BorrowAsset)
 	collateralDecimals := h.getTokenDecimals(ctx, event.CollateralAsset)
+	borrowSymbol := h.getTokenSymbol(ctx, event.BorrowAsset)
+	collateralSymbol := h.getTokenSymbol(ctx, event.CollateralAsset)
 
 	logger.InfoContext(ctx, "Fetched token decimals",
 		"borrow_asset", event.BorrowAsset.Hex(),
 		"borrow_decimals", borrowDecimals,
+		"borrow_symbol", borrowSymbol,
 		"collateral_asset", event.CollateralAsset.Hex(),
 		"collateral_decimals", collateralDecimals,
+		"collateral_symbol", collateralSymbol,
 	)
 
 	market := &models.Market{
 		Address:                 event.MarketAddress.Hex(),
 		Borrower:                event.Borrower.Hex(),
 		BorrowAsset:             event.BorrowAsset.Hex(),
+		BorrowAssetSymbol:       sql.NullString{String: borrowSymbol, Valid: borrowSymbol != ""},
 		BorrowAssetDecimals:     borrowDecimals,
 		CollateralAsset:         event.CollateralAsset.Hex(),
+		CollateralAssetSymbol:   sql.NullString{String: collateralSymbol, Valid: collateralSymbol != ""},
 		CollateralAssetDecimals: collateralDecimals,
 		CollateralOracle:        event.Oracle.Hex(),
 		MinCollateralRatio:      int32(event.MinCollateralRatio.Int64()),
@@ -205,6 +209,46 @@ func (h *MarketHandler) getTokenDecimals(ctx context.Context, tokenAddress commo
 	return int16(decimals)
 }
 
+// getTokenSymbol fetches the symbol from an ERC20 token contract (e.g. "USDC", "WETH").
+// Without this, the frontend and API have no way to label which token is
+// being borrowed/used as collateral beyond a raw address - callers fall back
+// to an empty string on failure, which the API layer already treats as
+// "unknown" via sql.NullString.
+func (h *MarketHandler) getTokenSymbol(ctx context.Context, tokenAddress common.Address) string {
+	symbolABI := `[{"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"}]`
+
+	parsedABI, err := abi.JSON(strings.NewReader(symbolABI))
+	if err != nil {
+		logger.WarnContext(ctx, "Failed to parse ERC20 ABI for symbol",
+			logger.WithError(err),
+			"token", tokenAddress.Hex(),
+		)
+		return ""
+	}
+
+	contract := bind.NewBoundContract(tokenAddress, parsedABI, h.ethClient, h.ethClient, h.ethClient)
+
+	var result []interface{}
+	err = contract.Call(&bind.CallOpts{Context: ctx}, &result, "symbol")
+	if err != nil {
+		logger.WarnContext(ctx, "Failed to fetch token symbol",
+			logger.WithError(err),
+			"token", tokenAddress.Hex(),
+		)
+		return ""
+	}
+
+	if len(result) == 0 {
+		return ""
+	}
+
+	symbol, ok := result[0].(string)
+	if !ok {
+		return ""
+	}
+	return symbol
+}
+
 /*@
  * handleMarketPaused
  * @desc Processes MarketPaused event - updates market status
@@ -212,7 +256,11 @@ func (h *MarketHandler) getTokenDecimals(ctx context.Context, tokenAddress commo
  * @param blockNum Block number where pause occurred
  */
 func (h *MarketHandler) handleMarketPaused(ctx context.Context, event *types.MarketPausedEvent, blockNum uint64) error {
-	return h.eventRepo.UpdateMarketStatus(ctx, event.Market.Hex(), false, true)
+	// Pausing is orthogonal to liquidation state - a paused market isn't
+	// necessarily liquidating, and this used to incorrectly force
+	// is_liquidating=true on every pause (and clear it on every unpause),
+	// clobbering the real liquidation flag regardless of actual state.
+	return h.eventRepo.UpdateMarketActive(ctx, event.Market.Hex(), false)
 }
 
 /*@
@@ -222,45 +270,42 @@ func (h *MarketHandler) handleMarketPaused(ctx context.Context, event *types.Mar
  * @param blockNum Block number where unpause occurred
  */
 func (h *MarketHandler) handleMarketUnpaused(ctx context.Context, event *types.MarketUnpausedEvent, blockNum uint64) error {
-	return h.eventRepo.UpdateMarketStatus(ctx, event.Market.Hex(), true, false)
-}
-
-/*@
- * handleInterestAccrued
- * @desc Processes InterestAccrued event - updates market borrow index
- * @param event Decoded InterestAccrued event
- * @param blockNum Block number where interest accrued
- */
-func (h *MarketHandler) handleInterestAccrued(ctx context.Context, event *types.InterestAccruedEvent, blockNum uint64) error {
-	return h.eventRepo.UpdateMarketBorrowIndex(ctx, event.Market.Hex())
+	return h.eventRepo.UpdateMarketActive(ctx, event.Market.Hex(), true)
 }
 
 /*@
  * handleMarketClosed
  * @desc Processes MarketClosedEvent - permanently closes the market
- * @param event Decoded MarketClosed event containing borrower and timestamp
+ * @param event Decoded MarketClosed event containing market, borrower and timestamp
  * @param blockNum Block number where market was closed
  * @note Sets is_closed=true and is_active=false; closed markets cannot be reopened.
- *       The Borrower field identifies which borrower's market was closed.
+ *       CloseMarket matches against markets.address (the Market contract's own
+ *       address), so it must be called with event.Market, not event.Borrower -
+ *       those are two different addresses. Passing the borrower's address here
+ *       previously meant the UPDATE's WHERE clause never matched any row, so
+ *       closing a market never actually flipped is_active/is_closed in the
+ *       database - the Lend page kept offering a permanently-closed market
+ *       for new offers indefinitely.
  */
 func (h *MarketHandler) handleMarketClosed(ctx context.Context, event *types.MarketClosedEvent, blockNum uint64) error {
 	logger.InfoContext(ctx, "Processing MarketClosed event",
 		logger.WithEventName("MarketClosed"),
 		logger.WithBlockNumber(blockNum),
+		logger.WithMarketAddress(event.Market.Hex()),
 		logger.WithBorrower(event.Borrower.Hex()),
 		"timestamp", event.Timestamp.Int64(),
 	)
 
-	if err := h.eventRepo.CloseMarket(ctx, event.Borrower.Hex()); err != nil {
+	if err := h.eventRepo.CloseMarket(ctx, event.Market.Hex()); err != nil {
 		logger.ErrorContext(ctx, "Failed to close market",
 			logger.WithError(err),
-			logger.WithBorrower(event.Borrower.Hex()),
+			logger.WithMarketAddress(event.Market.Hex()),
 		)
 		return err
 	}
 
 	logger.InfoContext(ctx, "Market closed successfully",
-		logger.WithBorrower(event.Borrower.Hex()),
+		logger.WithMarketAddress(event.Market.Hex()),
 	)
 
 	return nil

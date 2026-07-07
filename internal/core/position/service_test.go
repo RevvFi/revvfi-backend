@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/Revvfi/revvfi-backend/internal/models"
 	"github.com/stretchr/testify/assert"
@@ -335,6 +336,11 @@ Tests portfolio summary calculation.
 */
 func TestGetPortfolioSummary(t *testing.T) {
 	lender := "0xLender1"
+	// AccruedInterest is now recomputed live from CurrentPrincipal/APR/elapsed
+	// time since LastUpdated (see applyLiveAccrual), not read as a static
+	// stored field - so LastUpdated must be set to a known, fixed elapsed
+	// time for this test's expected totals to be deterministic.
+	oneYearAgo := time.Now().Add(-365 * 24 * time.Hour)
 	mockRepo := &MockPositionRepository{
 		positions: map[int64]*models.Position{
 			1: {
@@ -342,20 +348,20 @@ func TestGetPortfolioSummary(t *testing.T) {
 				Lender:           lender,
 				Principal:        big.NewInt(1000000),
 				CurrentPrincipal: big.NewInt(1000000),
-				AccruedInterest:  big.NewInt(50000),
-				APR:              500,
+				APR:              500, // 5% of 1,000,000 over 1 year = 50,000
 				IsActive:         true,
 				Status:           "active",
+				LastUpdated:      oneYearAgo,
 			},
 			2: {
 				TokenID:          2,
 				Lender:           lender,
 				Principal:        big.NewInt(2000000),
 				CurrentPrincipal: big.NewInt(2000000),
-				AccruedInterest:  big.NewInt(100000),
-				APR:              600,
+				APR:              600, // 6% of 2,000,000 over 1 year = 120,000
 				IsActive:         true,
 				Status:           "active",
+				LastUpdated:      oneYearAgo,
 			},
 		},
 		err: nil,
@@ -367,7 +373,7 @@ func TestGetPortfolioSummary(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, summary)
 	assert.Equal(t, int32(2), summary["active_positions"])
-	assert.Equal(t, "150000", summary["earned_interest"])
+	assert.Equal(t, "170000", summary["earned_interest"])
 }
 
 /*

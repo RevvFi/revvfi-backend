@@ -19,6 +19,8 @@ import (
  *   - PositionMinted: New lender position created
  *   - PositionSettled: Position fully repaid and settled
  *   - PositionRedeemed: Lender redeems position NFT for principal + interest
+ *   - LenderRepaid: Position received a partial repayment share
+ *   - PositionClaimed: Claimable balance cleared for a still-active position
  *   - Transfer: Position NFT transferred between wallets
  */
 type PositionHandler struct {
@@ -45,6 +47,10 @@ func (h *PositionHandler) Handle(ctx context.Context, event interface{}, blockNu
 		return h.handlePositionSettled(ctx, e, blockNum)
 	case *types.PositionRedeemedEvent:
 		return h.handlePositionRedeemed(ctx, e, blockNum)
+	case *types.LenderRepaidEvent:
+		return h.handleLenderRepaid(ctx, e, blockNum)
+	case *types.PositionClaimedEvent:
+		return h.handlePositionClaimed(ctx, e, blockNum)
 	case *types.PositionTransferEvent:
 		return h.handlePositionTransfer(ctx, e, blockNum)
 	}
@@ -99,6 +105,32 @@ func (h *PositionHandler) handlePositionRedeemed(ctx context.Context, event *typ
 	log.Printf("PositionRedeemed: TokenID=%d Principal=%s Interest=%s Block=%d",
 		event.TokenID.Int64(), event.Principal.String(), event.Interest.String(), blockNum)
 	return h.eventRepo.RedeemPosition(ctx, event.TokenID.Int64(), event.Principal, event.Interest)
+}
+
+/*@
+ * handleLenderRepaid
+ * @desc Processes LenderRepaid event - updates a still-active position's
+ *       principal and claimable balance after a partial repayment
+ * @param event Decoded LenderRepaid event
+ * @param blockNum Block number where the repayment occurred
+ */
+func (h *PositionHandler) handleLenderRepaid(ctx context.Context, event *types.LenderRepaidEvent, blockNum uint64) error {
+	log.Printf("LenderRepaid: TokenID=%d NewPrincipal=%s ClaimableShare=%s Block=%d",
+		event.PositionID.Int64(), event.NewPrincipal.String(), event.ClaimableShare.String(), blockNum)
+	return h.eventRepo.RecordPartialRepayment(ctx, event.PositionID.Int64(), event.NewPrincipal, event.ClaimableShare)
+}
+
+/*@
+ * handlePositionClaimed
+ * @desc Processes PositionClaimed event - clears the claimable balance for a
+ *       position that is still active
+ * @param event Decoded PositionClaimed event
+ * @param blockNum Block number where the claim occurred
+ */
+func (h *PositionHandler) handlePositionClaimed(ctx context.Context, event *types.PositionClaimedEvent, blockNum uint64) error {
+	log.Printf("PositionClaimed: TokenID=%d Lender=%s Amount=%s Block=%d",
+		event.TokenID.Int64(), event.Lender.Hex(), event.Amount.String(), blockNum)
+	return h.eventRepo.ClearClaimable(ctx, event.TokenID.Int64())
 }
 
 /*@

@@ -230,8 +230,8 @@ func (d *EventDecoder) Decode(log goEthtypes.Log) (interface{}, error) {
         return d.decodeBorrow(log)
     case "Repay":
         return d.decodeRepay(log)
-    case "InterestAccrued":
-        return d.decodeInterestAccrued(log)
+    case "LenderRepaid":
+        return d.decodeLenderRepaid(log)
     case "CollateralDeposited":
         return d.decodeCollateralDeposited(log)
     case "CollateralWithdrawn":
@@ -511,7 +511,8 @@ func (d *EventDecoder) decodeBorrow(log goEthtypes.Log) (*indexertypes.BorrowEve
     
     event.Amount = new(big.Int).SetBytes(log.Data[0:32])
     event.WeightedAPR = new(big.Int).SetBytes(log.Data[32:64])
-    
+    event.Market = log.Address
+
     return event, nil
 }
 
@@ -548,39 +549,7 @@ func (d *EventDecoder) decodeRepay(log goEthtypes.Log) (*indexertypes.RepayEvent
     event.Amount = new(big.Int).SetBytes(log.Data[0:32])
     event.InterestPaid = new(big.Int).SetBytes(log.Data[32:64])
     event.PrincipalPaid = new(big.Int).SetBytes(log.Data[64:96])
-
-    return event, nil
-}
-
-/*@
- * @method decodeInterestAccrued
- * @contract RevvFiMarket
- * @event InterestAccrued(address indexed market, uint256 borrowIndex)
- *
- * @topics_structure (2 topics total):
- *   topics[0]: Event signature hash
- *   topics[1]: market address (indexed)
- *
- * @data_structure (32 bytes total):
- *   bytes[0:32]: borrowIndex (uint256)
- *
- * @fix_applied: Data length changed from 64 to 32 bytes
- *               Removed Timestamp field that was not in actual blockchain data
- */
-func (d *EventDecoder) decodeInterestAccrued(log goEthtypes.Log) (*indexertypes.InterestAccruedEvent, error) {
-    event := &indexertypes.InterestAccruedEvent{}
-
-    if len(log.Topics) < 2 {
-        return nil, fmt.Errorf("InterestAccrued: expected at least 2 topics")
-    }
-
-    event.Market = common.HexToAddress(log.Topics[1].Hex())
-
-    if len(log.Data) < 32 {
-        return nil, fmt.Errorf("InterestAccrued: insufficient data length, expected 32 bytes, got %d", len(log.Data))
-    }
-
-    event.BorrowIndex = new(big.Int).SetBytes(log.Data[0:32])
+    event.Market = log.Address
 
     return event, nil
 }
@@ -679,15 +648,15 @@ func (d *EventDecoder) decodeOfferCancelled(log goEthtypes.Log) (*indexertypes.O
     
     event.OfferID = new(big.Int).SetBytes(log.Topics[1].Bytes())
     event.Lender = common.HexToAddress(log.Topics[2].Hex())
-    
+
     if len(log.Topics) > 3 {
         event.Market = common.HexToAddress(log.Topics[3].Hex())
     }
-    
+
     if len(log.Data) >= 32 {
         event.RemainingAmount = new(big.Int).SetBytes(log.Data[0:32])
     }
-    
+
     return event, nil
 }
 
@@ -713,13 +682,13 @@ func (d *EventDecoder) decodeOfferFilled(log goEthtypes.Log) (*indexertypes.Offe
     
     event.OfferID = new(big.Int).SetBytes(log.Topics[1].Bytes())
     event.Lender = common.HexToAddress(log.Topics[2].Hex())
-    
+
     if len(log.Data) < 32 {
         return nil, fmt.Errorf("OfferFilled: insufficient data length, need 32 bytes, got %d", len(log.Data))
     }
-    
+
     event.Amount = new(big.Int).SetBytes(log.Data[0:32])
-    
+
     return event, nil
 }
 
@@ -733,13 +702,13 @@ func (d *EventDecoder) decodeOfferModified(log goEthtypes.Log) (*indexertypes.Of
     if len(log.Topics) < 2 {
         return nil, fmt.Errorf("OfferModified: insufficient topics")
     }
-    
+
     event.OfferID = new(big.Int).SetBytes(log.Topics[1].Bytes())
-    
+
     if len(log.Topics) > 2 {
         event.Lender = common.HexToAddress(log.Topics[2].Hex())
     }
-    
+
     if len(log.Data) < 96 {
         return nil, fmt.Errorf("OfferModified: insufficient data length")
     }
@@ -1398,6 +1367,7 @@ func (d *EventDecoder) decodeMarketClosedEvent(log goEthtypes.Log) (*indexertype
     }
 
     event.Borrower = common.HexToAddress(log.Topics[1].Hex())
+    event.Market = log.Address
 
     if len(log.Data) < 32 {
         return nil, fmt.Errorf("MarketClosedEvent: insufficient data length, expected 32 bytes, got %d", len(log.Data))
@@ -1458,6 +1428,40 @@ func (d *EventDecoder) decodePositionRedeemed(log goEthtypes.Log) (*indexertypes
 
     event.Principal = new(big.Int).SetBytes(log.Data[0:32])
     event.Interest = new(big.Int).SetBytes(log.Data[32:64])
+
+    return event, nil
+}
+
+/*@
+ * @method decodeLenderRepaid
+ * @contract RevvFiMarket
+ * @event LenderRepaid(address indexed lender, uint256 indexed positionId, uint256 newPrincipal, uint256 claimableShare)
+ *
+ * @topics_structure (3 topics total):
+ *   topics[0]: Event signature hash
+ *   topics[1]: lender (indexed)
+ *   topics[2]: positionId (indexed)
+ *
+ * @data_structure (64 bytes total):
+ *   bytes[0:32]:  newPrincipal (uint256)
+ *   bytes[32:64]: claimableShare (uint256)
+ */
+func (d *EventDecoder) decodeLenderRepaid(log goEthtypes.Log) (*indexertypes.LenderRepaidEvent, error) {
+    event := &indexertypes.LenderRepaidEvent{}
+
+    if len(log.Topics) < 3 {
+        return nil, fmt.Errorf("LenderRepaid: expected at least 3 topics, got %d", len(log.Topics))
+    }
+
+    event.Lender = common.HexToAddress(log.Topics[1].Hex())
+    event.PositionID = new(big.Int).SetBytes(log.Topics[2].Bytes())
+
+    if len(log.Data) < 64 {
+        return nil, fmt.Errorf("LenderRepaid: insufficient data length, expected 64 bytes, got %d", len(log.Data))
+    }
+
+    event.NewPrincipal = new(big.Int).SetBytes(log.Data[0:32])
+    event.ClaimableShare = new(big.Int).SetBytes(log.Data[32:64])
 
     return event, nil
 }
@@ -1826,6 +1830,7 @@ func (d *EventDecoder) decodeLiquidationStartedMarket(log goEthtypes.Log) (*inde
     }
 
     event.Borrower = common.HexToAddress(log.Topics[1].Hex())
+    event.Market = log.Address
 
     return event, nil
 }
@@ -1839,6 +1844,7 @@ func (d *EventDecoder) decodeLiquidationEndedMarket(log goEthtypes.Log) (*indexe
     }
 
     event.Borrower = common.HexToAddress(log.Topics[1].Hex())
+    event.Market = log.Address
 
     return event, nil
 }

@@ -173,10 +173,10 @@ func (r *EventRepository) SaveOffer(ctx context.Context, offer *models.Offer) er
             remaining_amount = EXCLUDED.remaining_amount,
             status = EXCLUDED.status,
             updated_at = EXCLUDED.updated_at
-    `, offer.OfferID, offer.Lender, offer.MarketAddress, offer.Amount.String(), 
+    `, offer.OfferID, offer.Lender, offer.MarketAddress, offer.Amount.String(),
        offer.RemainingAmount.String(), offer.APR, offer.Seniority, offer.Status,
        offer.Expiry, offer.BlockNumber, offer.TxHash, offer.CreatedAt, offer.UpdatedAt)
-    
+
     return mapError(err)
 }
 
@@ -188,11 +188,11 @@ func (r *EventRepository) SaveOffer(ctx context.Context, offer *models.Offer) er
 */
 func (r *EventRepository) UpdateOfferStatus(ctx context.Context, offerID int64, status string) error {
     _, err := r.db.conn.ExecContext(ctx, `
-        UPDATE offers 
+        UPDATE offers
         SET status = $2, updated_at = NOW()
         WHERE offer_id = $1
     `, offerID, status)
-    
+
     return mapError(err)
 }
 
@@ -204,17 +204,17 @@ func (r *EventRepository) UpdateOfferStatus(ctx context.Context, offerID int64, 
 */
 func (r *EventRepository) UpdateOfferRemaining(ctx context.Context, offerID int64, remainingAmount *big.Int) error {
     _, err := r.db.conn.ExecContext(ctx, `
-        UPDATE offers 
-        SET remaining_amount = $2, 
-            status = CASE 
-                WHEN $2 = '0' THEN 'filled' 
-                WHEN amount != $2 THEN 'partially_filled' 
-                ELSE status 
+        UPDATE offers
+        SET remaining_amount = $2,
+            status = CASE
+                WHEN $2 = '0' THEN 'filled'
+                WHEN amount != $2 THEN 'partially_filled'
+                ELSE status
             END,
             updated_at = NOW()
         WHERE offer_id = $1
     `, offerID, remainingAmount.String())
-    
+
     return mapError(err)
 }
 
@@ -230,17 +230,17 @@ func (r *EventRepository) UpdateOfferRemaining(ctx context.Context, offerID int6
 func (r *EventRepository) SaveMarket(ctx context.Context, market *models.Market) error {
     _, err := r.db.conn.ExecContext(ctx, `
         INSERT INTO markets (
-            address, borrower, borrow_asset, borrow_asset_decimals,
-            collateral_asset, collateral_asset_decimals, collateral_oracle,
+            address, borrower, borrow_asset, borrow_asset_symbol, borrow_asset_decimals,
+            collateral_asset, collateral_asset_symbol, collateral_asset_decimals, collateral_oracle,
             min_collateral_ratio, liquidation_threshold, is_active, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         ON CONFLICT (address) DO NOTHING
-    `, market.Address, market.Borrower, market.BorrowAsset,
-       market.BorrowAssetDecimals, market.CollateralAsset, 
+    `, market.Address, market.Borrower, market.BorrowAsset, market.BorrowAssetSymbol,
+       market.BorrowAssetDecimals, market.CollateralAsset, market.CollateralAssetSymbol,
        market.CollateralAssetDecimals, market.CollateralOracle,
        market.MinCollateralRatio, market.LiquidationThreshold,
        market.IsActive, market.CreatedAt)
-    
+
     return mapError(err)
 }
 
@@ -268,40 +268,83 @@ func (r *EventRepository) UpdateMarketStatus(ctx context.Context, marketAddress 
 }
 
 /*@
- * UpdateMarketBorrowIndex
- * @desc Updates market borrow index for interest accrual tracking
+ * UpdateMarketLiquidating
+ * @desc Updates only is_liquidating, leaving is_active untouched. Pause/unpause
+ *       and liquidation start/end are orthogonal states on the same market -
+ *       UpdateMarketStatus's combined write was letting the pause handler
+ *       clobber is_liquidating (and vice versa) any time either fired.
  * @param ctx Context for cancellation
  * @param marketAddress Market contract address
- * @param borrowIndex New borrow index (1e18 scale)
+ * @param isLiquidating Whether market is in liquidation
  * @returns error if update fails
- *
- * @formula borrowIndex = borrowIndex * (1 + interestRate * timeElapsed)
- * @scale 1e18 (10^18)
  */
-/*
-@method UpdateMarketBorrowIndex
-@desc Updates market borrow index from InterestAccrued event
-@param marketAddress Market contract address
-@param borrowIndex New borrow index value (optional, can be nil if not provided)
-@note If borrowIndex is nil, just updates last_interest_accrual timestamp
-*/
-func (r *EventRepository) UpdateMarketBorrowIndex(ctx context.Context, marketAddress string, borrowIndex ...*big.Int) error {
-    if len(borrowIndex) > 0 && borrowIndex[0] != nil {
-        _, err := r.db.conn.ExecContext(ctx, `
-            UPDATE markets
-            SET borrow_index = $2,
-                last_interest_accrual = NOW()
-            WHERE address = $1
-        `, marketAddress, borrowIndex[0].String())
-        return mapError(err)
-    }
-
-    // If no borrow index provided, just update timestamp
+func (r *EventRepository) UpdateMarketLiquidating(ctx context.Context, marketAddress string, isLiquidating bool) error {
     _, err := r.db.conn.ExecContext(ctx, `
         UPDATE markets
-        SET last_interest_accrual = NOW()
+        SET is_liquidating = $2,
+            last_health_check = NOW()
         WHERE address = $1
-    `, marketAddress)
+    `, marketAddress, isLiquidating)
+
+    return mapError(err)
+}
+
+/*@
+ * UpdateMarketActive
+ * @desc Updates only is_active, leaving is_liquidating untouched.
+ * @param ctx Context for cancellation
+ * @param marketAddress Market contract address
+ * @param isActive Whether market is active
+ * @returns error if update fails
+ */
+func (r *EventRepository) UpdateMarketActive(ctx context.Context, marketAddress string, isActive bool) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        UPDATE markets
+        SET is_active = $2,
+            last_health_check = NOW()
+        WHERE address = $1
+    `, marketAddress, isActive)
+
+    return mapError(err)
+}
+
+/*@
+ * IncrementMarketDebt
+ * @desc Increases a market's total_debt and total_principal after a Borrow event
+ * @param ctx Context for cancellation
+ * @param marketAddress Market contract address
+ * @param amount Amount drawn down (added to both principal and debt)
+ * @returns error if update fails
+ */
+func (r *EventRepository) IncrementMarketDebt(ctx context.Context, marketAddress string, amount *big.Int) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        UPDATE markets
+        SET total_debt = (total_debt::numeric + $2::numeric)::text,
+            total_principal = (total_principal::numeric + $2::numeric)::text,
+            last_health_check = NOW()
+        WHERE address = $1
+    `, marketAddress, amount.String())
+
+    return mapError(err)
+}
+
+/*@
+ * DecrementMarketDebt
+ * @desc Decreases a market's total_debt and total_principal after a Repay event
+ * @param ctx Context for cancellation
+ * @param marketAddress Market contract address
+ * @param debtAmount Total amount repaid (principal + interest), subtracted from total_debt
+ * @param principalAmount Principal portion repaid, subtracted from total_principal
+ * @returns error if update fails
+ */
+func (r *EventRepository) DecrementMarketDebt(ctx context.Context, marketAddress string, debtAmount, principalAmount *big.Int) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        UPDATE markets
+        SET total_debt = GREATEST(total_debt::numeric - $2::numeric, 0)::text,
+            total_principal = GREATEST(total_principal::numeric - $3::numeric, 0)::text,
+            last_health_check = NOW()
+        WHERE address = $1
+    `, marketAddress, debtAmount.String(), principalAmount.String())
 
     return mapError(err)
 }
@@ -452,13 +495,13 @@ func (r *EventRepository) SaveAuction(ctx context.Context, auction *models.Aucti
 */
 func (r *EventRepository) UpdateAuctionBid(ctx context.Context, auctionID int64, highestBid *big.Int, highestBidder string) error {
     _, err := r.db.conn.ExecContext(ctx, `
-        UPDATE auctions 
-        SET highest_bid = $2, 
-            highest_bidder = $3, 
+        UPDATE auctions
+        SET highest_bid = $2,
+            highest_bidder = $3,
             updated_at = NOW()
         WHERE auction_id = $1
     `, auctionID, highestBid.String(), highestBidder)
-    
+
     return mapError(err)
 }
 
@@ -710,12 +753,12 @@ func (r *EventRepository) UpdateBorrowerWhitelistStatus(ctx context.Context, bor
     
     // Update existing borrower
     _, err = r.db.conn.ExecContext(ctx, `
-        UPDATE borrowers 
+        UPDATE borrowers
         SET is_whitelisted = $2,
             last_activity = NOW()
         WHERE address = $1
     `, borrowerAddress, isWhitelisted)
-    
+
     return mapError(err)
 }
 
@@ -789,7 +832,7 @@ func (r *EventRepository) UpdateOffer(
     status string,
 ) error {
     _, err := r.db.conn.ExecContext(ctx, `
-        UPDATE offers 
+        UPDATE offers
         SET amount = $2,
             remaining_amount = $2,
             apr = $3,
@@ -1107,6 +1150,43 @@ func (r *EventRepository) RedeemPosition(ctx context.Context, tokenID int64, pri
             last_updated   = NOW()
         WHERE token_id = $1
     `, tokenID, totalRedeemed.String())
+    return mapError(err)
+}
+
+/*@
+ * RecordPartialRepayment
+ * @desc Updates a still-active position after a partial repayment (LenderRepaid event)
+ * @param tokenID Position NFT token ID
+ * @param newPrincipal Position's absolute remaining principal after this payment
+ * @param claimableShare Incremental amount credited to the lender's claimable balance this round
+ * @note Position stays active; claimable_amount is incremented, current_principal is set
+ * @sql UPDATE positions SET current_principal=$2, claimable_amount+=$3, last_updated=NOW()
+ */
+func (r *EventRepository) RecordPartialRepayment(ctx context.Context, tokenID int64, newPrincipal, claimableShare *big.Int) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        UPDATE positions
+        SET current_principal = $2,
+            claimable_amount   = (claimable_amount::numeric + $3::numeric)::text,
+            last_updated       = NOW()
+        WHERE token_id = $1
+    `, tokenID, newPrincipal.String(), claimableShare.String())
+    return mapError(err)
+}
+
+/*@
+ * ClearClaimable
+ * @desc Zeroes a position's claimable balance after the lender claims it (PositionClaimed event)
+ * @param tokenID Position NFT token ID
+ * @note Does not touch is_active/is_settled - the position may still be open
+ * @sql UPDATE positions SET claimable_amount='0', last_updated=NOW()
+ */
+func (r *EventRepository) ClearClaimable(ctx context.Context, tokenID int64) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        UPDATE positions
+        SET claimable_amount = '0',
+            last_updated     = NOW()
+        WHERE token_id = $1
+    `, tokenID)
     return mapError(err)
 }
 

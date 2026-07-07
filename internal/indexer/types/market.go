@@ -26,21 +26,11 @@ Borrower repays debt.
 actual_data: 96 bytes (amount + interestPaid + principalPaid)
 */
 type RepayEvent struct {
+	Market        common.Address
 	Borrower      common.Address
 	Amount        *big.Int
 	InterestPaid  *big.Int
 	PrincipalPaid *big.Int
-}
-
-/*@
-event: InterestAccrued
-description:
-Market interest state updated.
-actual_data: 32 bytes (borrowIndex only)
-*/
-type InterestAccruedEvent struct {
-	Market      common.Address
-	BorrowIndex *big.Int
 }
 
 /*@
@@ -93,12 +83,14 @@ type LiquidationExecutedEvent struct {
  * @trigger When market is closed by admin or automatically
  */
 type MarketClosedEvent struct {
+	Market    common.Address
 	Borrower  common.Address
 	Timestamp *big.Int
 }
 
 
 type BorrowEvent struct {
+    Market       common.Address
     Borrower     common.Address
     Amount       *big.Int
     WeightedAPR  *big.Int
@@ -112,10 +104,12 @@ type DrawdownExecutedEvent struct {
 
 // LiquidationStartedMarket is emitted by RevvFiMarket when liquidation begins
 type LiquidationStartedMarketEvent struct {
+    Market   common.Address
     Borrower common.Address
 }
 
 // LiquidationEndedMarket is emitted by RevvFiMarket when liquidation completes
 type LiquidationEndedMarketEvent struct {
+    Market   common.Address
     Borrower common.Address
 }
