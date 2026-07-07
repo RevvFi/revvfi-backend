@@ -1,5 +1,7 @@
 .env
+.env.local
 Makefile
+.bin/
 IMPLEMENTATION_SUMMARY.md
 Readme.md
 PROGRESS.md
