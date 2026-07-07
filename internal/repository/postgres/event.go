@@ -169,7 +169,7 @@ func (r *EventRepository) SaveOffer(ctx context.Context, offer *models.Offer) er
             offer_id, lender, market_address, amount, remaining_amount,
             apr, seniority, status, expiry, block_number, tx_hash, created_at, updated_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-        ON CONFLICT (offer_id) DO UPDATE SET
+        ON CONFLICT (offer_id, market_address) DO UPDATE SET
             remaining_amount = EXCLUDED.remaining_amount,
             status = EXCLUDED.status,
             updated_at = EXCLUDED.updated_at
@@ -192,6 +192,42 @@ func (r *EventRepository) UpdateOfferStatus(ctx context.Context, offerID int64, 
         SET status = $2, updated_at = NOW()
         WHERE offer_id = $1
     `, offerID, status)
+
+    return mapError(err)
+}
+
+/*
+@method CancelOffer
+@desc Marks an offer cancelled by the lender: zeroes remaining_amount (funds
+      were fully refunded on-chain) and stamps cancelled_at for audit purposes.
+@param offerID Offer ID to update (scoped to marketAddress - offer IDs are
+       only unique per-OfferBook-contract, not globally, so both are required
+       to identify the correct row across multiple markets)
+@param marketAddress OfferBook contract address that emitted the event
+*/
+func (r *EventRepository) CancelOffer(ctx context.Context, offerID int64, marketAddress string) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        UPDATE offers
+        SET status = 'cancelled', remaining_amount = '0', cancelled_at = NOW(), updated_at = NOW()
+        WHERE offer_id = $1 AND market_address = $2
+    `, offerID, marketAddress)
+
+    return mapError(err)
+}
+
+/*
+@method ExpireOffer
+@desc Marks an offer expired via cleanupExpiredOffers: zeroes remaining_amount
+      (funds were fully refunded on-chain) and stamps expired_at for audit purposes.
+@param offerID Offer ID to update (scoped to marketAddress, see CancelOffer)
+@param marketAddress OfferBook contract address that emitted the event
+*/
+func (r *EventRepository) ExpireOffer(ctx context.Context, offerID int64, marketAddress string) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        UPDATE offers
+        SET status = 'expired', remaining_amount = '0', expired_at = NOW(), updated_at = NOW()
+        WHERE offer_id = $1 AND market_address = $2
+    `, offerID, marketAddress)
 
     return mapError(err)
 }
@@ -826,6 +862,7 @@ func (r *EventRepository) GetLastCheckpoint(ctx context.Context) (*models.ChainC
 func (r *EventRepository) UpdateOffer(
     ctx context.Context,
     offerID int64,
+    marketAddress string,
     newAmount *big.Int,
     newAPR *big.Int,
     newExpiry time.Time,
@@ -833,14 +870,14 @@ func (r *EventRepository) UpdateOffer(
 ) error {
     _, err := r.db.conn.ExecContext(ctx, `
         UPDATE offers
-        SET amount = $2,
-            remaining_amount = $2,
-            apr = $3,
-            expiry = $4,
-            status = $5,
+        SET amount = $3,
+            remaining_amount = $3,
+            apr = $4,
+            expiry = $5,
+            status = $6,
             updated_at = NOW()
-        WHERE offer_id = $1
-    `, offerID, newAmount.String(), newAPR.Int64(), newExpiry, status)
+        WHERE offer_id = $1 AND market_address = $2
+    `, offerID, marketAddress, newAmount.String(), newAPR.Int64(), newExpiry, status)
 
     return mapError(err)
 }
@@ -1088,17 +1125,17 @@ func (r *EventRepository) CompleteEpoch(ctx context.Context, epoch *models.Withd
     return tx.Commit()
 }
 
-func (r *EventRepository) DecrementOfferRemaining(ctx context.Context, offerID int64, filledAmount *big.Int) error {
+func (r *EventRepository) DecrementOfferRemaining(ctx context.Context, offerID int64, marketAddress string, filledAmount *big.Int) error {
     _, err := r.db.conn.ExecContext(ctx, `
         UPDATE offers
-        SET remaining_amount = remaining_amount::numeric - $2,
+        SET remaining_amount = remaining_amount::numeric - $3,
             status = CASE
-                WHEN remaining_amount::numeric - $2 <= 0 THEN 'filled'
+                WHEN remaining_amount::numeric - $3 <= 0 THEN 'filled'
                 ELSE 'partially_filled'
             END,
             updated_at = NOW()
-        WHERE offer_id = $1
-    `, offerID, filledAmount.String())
+        WHERE offer_id = $1 AND market_address = $2
+    `, offerID, marketAddress, filledAmount.String())
 
     return mapError(err)
 }

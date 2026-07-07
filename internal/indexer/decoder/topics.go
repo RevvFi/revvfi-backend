@@ -32,10 +32,11 @@ var EventTopics = map[string]string{
 	"Repay":                    "0x2fe77b1c99aca6b022b8efc6e3e8dd1b48b30748709339b65c50ef3263443e09",
 
 	// ============================================
-	// OFFERBOOK EVENTS (RevvFiOfferBook - 5 events)
+	// OFFERBOOK EVENTS (RevvFiOfferBook - 6 events)
 	// ============================================
 	"DrawdownExecutedOffer": "0x71bb7db5826ee7f4728165cba6e22dd34aee9a9b73be58e7ac6ea5be7609713f",
-	"OfferCancelled":        "0x1f51377b3e685a0e2419f9bb4ba7c07ec54936353ba3d0fb3c6538dab6766222",
+	"OfferCancelled":        "0xe2dc0bfd2fc658db980184c3f7c091c2f886874e896043b562d5099c8d95b1dd",
+	"OfferExpired":          "0x73dedbcfa9a17d6e3f87cd88fa5c704da1a9abff4ec94d2f1a0b0fd0b24d082a",
 	"OfferFilled":           "0xd5f3552d5f96296cf317f1ff0718c8430d2e840d3f949d1605e153e8f583a958",
 	"OfferModified":         "0xcec4e6d0937f30ec7b79423b833abf1e4dafe836737ef7d842a35c076c0ae42b",
 	"OfferSubmitted":        "0x2ee8871fe528da3127dc4dda62594b1154a1090e1686c055c8d3134ba47eb117",

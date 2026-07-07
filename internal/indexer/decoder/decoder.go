@@ -260,6 +260,8 @@ func (d *EventDecoder) Decode(log goEthtypes.Log) (interface{}, error) {
         return d.decodeOfferSubmitted(log)
     case "OfferCancelled":
         return d.decodeOfferCancelled(log)
+    case "OfferExpired":
+        return d.decodeOfferExpired(log)
     case "OfferFilled":
         return d.decodeOfferFilled(log)
     case "OfferModified":
@@ -648,10 +650,36 @@ func (d *EventDecoder) decodeOfferCancelled(log goEthtypes.Log) (*indexertypes.O
     
     event.OfferID = new(big.Int).SetBytes(log.Topics[1].Bytes())
     event.Lender = common.HexToAddress(log.Topics[2].Hex())
+    // Offer IDs are only unique per-OfferBook-contract (each market's
+    // OfferBook has its own counter starting at 1), so every offer event
+    // needs the emitting contract's own address to disambiguate which
+    // market's offer #N this actually refers to. OfferCancelled carries no
+    // market field in its Solidity signature, so use the log's own address
+    // (the OfferBook contract that emitted it) rather than a nonexistent topic.
+    event.Market = log.Address
 
-    if len(log.Topics) > 3 {
-        event.Market = common.HexToAddress(log.Topics[3].Hex())
+    if len(log.Data) >= 32 {
+        event.RemainingAmount = new(big.Int).SetBytes(log.Data[0:32])
     }
+
+    return event, nil
+}
+
+/*
+@method decodeOfferExpired
+@desc Decodes OfferExpired event, emitted by cleanupExpiredOffers()
+@event OfferExpired(uint256 indexed offerId, address indexed lender, uint256 refundedAmount)
+*/
+func (d *EventDecoder) decodeOfferExpired(log goEthtypes.Log) (*indexertypes.OfferExpiredEvent, error) {
+    event := &indexertypes.OfferExpiredEvent{}
+
+    if len(log.Topics) < 3 {
+        return nil, fmt.Errorf("OfferExpired: insufficient topics")
+    }
+
+    event.OfferID = new(big.Int).SetBytes(log.Topics[1].Bytes())
+    event.Lender = common.HexToAddress(log.Topics[2].Hex())
+    event.Market = log.Address
 
     if len(log.Data) >= 32 {
         event.RemainingAmount = new(big.Int).SetBytes(log.Data[0:32])
@@ -682,6 +710,7 @@ func (d *EventDecoder) decodeOfferFilled(log goEthtypes.Log) (*indexertypes.Offe
     
     event.OfferID = new(big.Int).SetBytes(log.Topics[1].Bytes())
     event.Lender = common.HexToAddress(log.Topics[2].Hex())
+    event.Market = log.Address
 
     if len(log.Data) < 32 {
         return nil, fmt.Errorf("OfferFilled: insufficient data length, need 32 bytes, got %d", len(log.Data))
@@ -704,6 +733,7 @@ func (d *EventDecoder) decodeOfferModified(log goEthtypes.Log) (*indexertypes.Of
     }
 
     event.OfferID = new(big.Int).SetBytes(log.Topics[1].Bytes())
+    event.Market = log.Address
 
     if len(log.Topics) > 2 {
         event.Lender = common.HexToAddress(log.Topics[2].Hex())

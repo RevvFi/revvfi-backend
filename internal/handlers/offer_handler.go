@@ -55,6 +55,8 @@ func (h *OfferHandler) Handle(ctx context.Context, event interface{}, blockNum u
 		return h.handleOfferSubmitted(ctx, e, blockNum)
 	case *types.OfferCancelledEvent:
 		return h.handleOfferCancelled(ctx, e, blockNum)
+	case *types.OfferExpiredEvent:
+		return h.handleOfferExpired(ctx, e, blockNum)
 	case *types.OfferFilledEvent:
 		return h.handleOfferFilled(ctx, e, blockNum)
 	case *types.OfferModifiedEvent:
@@ -148,7 +150,7 @@ func (h *OfferHandler) handleOfferCancelled(ctx context.Context, event *types.Of
 		logger.WithLender(event.Lender.Hex()),
 	)
 
-	if err := h.eventRepo.UpdateOfferStatus(ctx, event.OfferID.Int64(), "cancelled"); err != nil {
+	if err := h.eventRepo.CancelOffer(ctx, event.OfferID.Int64(), event.Market.Hex()); err != nil {
 		logger.ErrorContext(ctx, "Failed to cancel offer",
 			logger.WithError(err),
 			logger.WithOfferID(event.OfferID.Int64()),
@@ -157,6 +159,42 @@ func (h *OfferHandler) handleOfferCancelled(ctx context.Context, event *types.Of
 	}
 
 	logger.InfoContext(ctx, "Offer cancelled successfully",
+		logger.WithOfferID(event.OfferID.Int64()),
+	)
+
+	return nil
+}
+
+/*@
+ * handleOfferExpired
+ * @desc Processes OfferExpired event - marks offer as expired after
+ *   cleanupExpiredOffers() refunds the lender on-chain. Without this handler,
+ *   an expired-and-refunded offer would remain "active" forever in the API/UI
+ *   even though the lender's funds are already back in their wallet.
+ * @param event Decoded OfferExpired event
+ * @param blockNum Block number where the cleanup occurred
+ *
+ * @state_transition
+ *   - Status: "expired"
+ *   - RemainingAmount: 0 (funds returned to lender on-chain)
+ */
+func (h *OfferHandler) handleOfferExpired(ctx context.Context, event *types.OfferExpiredEvent, blockNum uint64) error {
+	logger.InfoContext(ctx, "Processing OfferExpired event",
+		logger.WithEventName("OfferExpired"),
+		logger.WithBlockNumber(blockNum),
+		logger.WithOfferID(event.OfferID.Int64()),
+		logger.WithLender(event.Lender.Hex()),
+	)
+
+	if err := h.eventRepo.ExpireOffer(ctx, event.OfferID.Int64(), event.Market.Hex()); err != nil {
+		logger.ErrorContext(ctx, "Failed to expire offer",
+			logger.WithError(err),
+			logger.WithOfferID(event.OfferID.Int64()),
+		)
+		return err
+	}
+
+	logger.InfoContext(ctx, "Offer expired successfully",
 		logger.WithOfferID(event.OfferID.Int64()),
 	)
 
@@ -177,7 +215,7 @@ func (h *OfferHandler) handleOfferCancelled(ctx context.Context, event *types.Of
  * @note This event is emitted during borrow() execution
  */
 func (h *OfferHandler) handleOfferFilled(ctx context.Context, event *types.OfferFilledEvent, blockNum uint64) error {
-	return h.eventRepo.DecrementOfferRemaining(ctx, event.OfferID.Int64(), event.Amount)
+	return h.eventRepo.DecrementOfferRemaining(ctx, event.OfferID.Int64(), event.Market.Hex(), event.Amount)
 }
 
 /*@
@@ -215,6 +253,7 @@ func (h *OfferHandler) handleOfferModified(ctx context.Context, event *types.Off
 	return h.eventRepo.UpdateOffer(
 		ctx,
 		event.OfferID.Int64(),
+		event.Market.Hex(),
 		event.NewAmount,
 		event.NewAPR,
 		expiryTime,

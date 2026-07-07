@@ -79,10 +79,11 @@ func NewRegistry(
 	r.Register("DrawdownExecuted", NewMarketHandler(eventRepo, ethClient, contractRegistry)) // complex array type, no DB write
 
 	// ============================================
-	// OFFERBOOK EVENTS (RevvFiOfferBook) - 5 events
+	// OFFERBOOK EVENTS (RevvFiOfferBook) - 6 events
 	// ============================================
 	r.Register("OfferSubmitted", NewOfferHandler(eventRepo))
 	r.Register("OfferCancelled", NewOfferHandler(eventRepo))
+	r.Register("OfferExpired", NewOfferHandler(eventRepo))
 	r.Register("OfferFilled", NewOfferHandler(eventRepo))
 	r.Register("OfferModified", NewOfferHandler(eventRepo))
 	r.Register("DrawdownExecutedOffer", NewOfferHandler(eventRepo))

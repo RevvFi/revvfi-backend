@@ -33,9 +33,17 @@ type OfferCancelledEvent struct {
 	RemainingAmount *big.Int
 }
 
+type OfferExpiredEvent struct {
+	OfferID         *big.Int
+	Lender          common.Address
+	Market          common.Address
+	RemainingAmount *big.Int
+}
+
 type OfferModifiedEvent struct {
 	OfferID   *big.Int
 	Lender    common.Address
+	Market    common.Address
 	NewAmount *big.Int
 	NewAPR    *big.Int
 	NewExpiry *big.Int
@@ -51,5 +59,6 @@ type DrawdownExecutedOfferEvent struct {
 type OfferFilledEvent struct {
     OfferID *big.Int
     Lender  common.Address
+    Market  common.Address
     Amount  *big.Int
 }
