@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"math/big"
 
 	"github.com/Revvfi/revvfi-backend/internal/models"
@@ -75,8 +76,19 @@ func (r *MarketRepository) GetByAddress(ctx context.Context, address string) (*m
 @desc
 Lists active market records with pagination.
 */
-func (r *MarketRepository) ListActive(ctx context.Context, limit, offset int32) ([]models.Market, error) {
-	rows, err := r.db.conn.QueryContext(ctx, `select id,address,borrower,borrow_asset,borrow_asset_symbol,borrow_asset_decimals,collateral_asset,collateral_asset_symbol,collateral_asset_decimals,collateral_oracle,min_collateral_ratio,liquidation_threshold,total_principal,total_accrued_interest,total_debt,total_liquidity,borrow_index,weighted_avg_apr,utilization_rate,is_active,is_liquidating,is_closed,current_auction_id,created_at,closed_at,last_interest_accrual,last_health_check from markets where is_active=true order by created_at desc limit $1 offset $2`, limit, offset)
+func (r *MarketRepository) ListActive(ctx context.Context, limit, offset int32, borrower string) ([]models.Market, error) {
+	query := `select id,address,borrower,borrow_asset,borrow_asset_symbol,borrow_asset_decimals,collateral_asset,collateral_asset_symbol,collateral_asset_decimals,collateral_oracle,min_collateral_ratio,liquidation_threshold,total_principal,total_accrued_interest,total_debt,total_liquidity,borrow_index,weighted_avg_apr,utilization_rate,is_active,is_liquidating,is_closed,current_auction_id,created_at,closed_at,last_interest_accrual,last_health_check from markets where is_active=true`
+	args := []interface{}{}
+	if borrower != "" {
+		args = append(args, borrower)
+		query += fmt.Sprintf(" and borrower ilike $%d", len(args))
+	}
+	args = append(args, limit)
+	query += fmt.Sprintf(" order by created_at desc limit $%d", len(args))
+	args = append(args, offset)
+	query += fmt.Sprintf(" offset $%d", len(args))
+
+	rows, err := r.db.conn.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -91,7 +103,7 @@ func (r *MarketRepository) ListActive(ctx context.Context, limit, offset int32) 
 Lists all active markets for liquidation monitoring.
 */
 func (r *MarketRepository) GetAllActive(ctx context.Context) ([]models.Market, error) {
-	return r.ListActive(ctx, 1000, 0)
+	return r.ListActive(ctx, 1000, 0, "")
 }
 
 /*
@@ -141,7 +153,8 @@ func (r *MarketRepository) List(ctx context.Context, page, pageSize int32, filte
 	if offset < 0 {
 		offset = 0
 	}
-	items, err := r.ListActive(ctx, limit, offset)
+	borrower, _ := filter["borrower"].(string)
+	items, err := r.ListActive(ctx, limit, offset, borrower)
 	return items, int64(len(items)), err
 }
 

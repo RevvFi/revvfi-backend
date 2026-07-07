@@ -87,6 +87,7 @@ type OfferListQuery struct {
 	Page          int32  `form:"page" binding:"omitempty,min=1"`
 	PageSize      int32  `form:"page_size" binding:"omitempty,min=1,max=100"`
 	MarketAddress string `form:"market_address" binding:"omitempty,eth_addr"`
+	Lender        string `form:"lender" binding:"omitempty,eth_addr"`
 	SortBy        string `form:"sort_by" binding:"omitempty,oneof=apr liquidity expiry"`
 	Order         string `form:"order" binding:"omitempty,oneof=asc desc"`
 }

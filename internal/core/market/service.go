@@ -54,7 +54,7 @@ Repository for market data access.
 type MarketRepository interface {
 	CreateMarket(ctx context.Context, market *models.Market) error
 	GetByAddress(ctx context.Context, address string) (*models.Market, error)
-	ListActive(ctx context.Context, limit, offset int32) ([]models.Market, error)
+	ListActive(ctx context.Context, limit, offset int32, borrower string) ([]models.Market, error)
 	UpdateMarket(ctx context.Context, market *models.Market) error
 }
 
@@ -201,12 +201,13 @@ func (s *MarketService) GetMarket(ctx context.Context, address string) (*models.
 @function ListMarkets
 
 @desc
-Lists active markets with pagination.
+Lists active markets with pagination, optionally scoped to a single borrower.
 
 @params
 - ctx: request context
 - limit: max results
 - offset: pagination offset
+- borrower: optional borrower address filter ("" = all borrowers)
 
 @returns
 - []models.Market: market list
@@ -215,8 +216,9 @@ Lists active markets with pagination.
 func (s *MarketService) ListMarkets(
 ctx context.Context,
 limit, offset int32,
+borrower string,
 ) ([]models.Market, error) {
-	markets, err := s.marketRepo.ListActive(ctx, limit, offset)
+	markets, err := s.marketRepo.ListActive(ctx, limit, offset, borrower)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list markets: %w", err)
 	}

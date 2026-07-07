@@ -44,7 +44,7 @@ Mock implementation of MarketService interface for testing.
 type mockMarketService struct {
 	createMarketFn     func(ctx context.Context, address string, borrower, borrowAsset, collateralAsset, collateralOracle string, minRatio, liquidationThreshold int32) (*models.Market, error)
 	getMarketFn        func(ctx context.Context, address string) (*models.Market, error)
-	listMarketsFn      func(ctx context.Context, limit, offset int32) ([]models.Market, error)
+	listMarketsFn      func(ctx context.Context, limit, offset int32, borrower string) ([]models.Market, error)
 	calculateMetricsFn func(ctx context.Context, market *models.Market) (map[string]interface{}, error)
 }
 
@@ -80,9 +80,9 @@ func (m *mockMarketService) GetMarket(ctx context.Context, address string) (*mod
 @desc
 Mock implementation of ListMarkets service method.
 */
-func (m *mockMarketService) ListMarkets(ctx context.Context, limit, offset int32) ([]models.Market, error) {
+func (m *mockMarketService) ListMarkets(ctx context.Context, limit, offset int32, borrower string) ([]models.Market, error) {
 	if m.listMarketsFn != nil {
-		return m.listMarketsFn(ctx, limit, offset)
+		return m.listMarketsFn(ctx, limit, offset, borrower)
 	}
 	return nil, fmt.Errorf("not implemented")
 }
@@ -528,7 +528,7 @@ func TestListMarkets_Success(t *testing.T) {
 		@desc Mock service to return list of markets.
 	*/
 	mockSvc := &mockMarketService{
-		listMarketsFn: func(ctx context.Context, limit, offset int32) ([]models.Market, error) {
+		listMarketsFn: func(ctx context.Context, limit, offset int32, borrower string) ([]models.Market, error) {
 			return []models.Market{
 				{
 					Address:        "0xmarket1",

@@ -56,4 +56,5 @@ type MarketListQuery struct {
 	Order       string `form:"order" binding:"omitempty,oneof=asc desc"`
 	BorrowAsset string `form:"borrow_asset" binding:"omitempty,eth_addr"`
 	IsActive    *bool  `form:"is_active" binding:"omitempty"`
+	Borrower    string `form:"borrower" binding:"omitempty,eth_addr"`
 }

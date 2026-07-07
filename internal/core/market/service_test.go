@@ -3,6 +3,7 @@ package market
 import (
 "context"
 "math/big"
+"strings"
 "testing"
 
 "github.com/Revvfi/revvfi-backend/internal/models"
@@ -50,12 +51,16 @@ func (m *MockMarketRepository) GetByAddress(ctx context.Context, address string)
 	return market, nil
 }
 
-func (m *MockMarketRepository) ListActive(ctx context.Context, limit, offset int32) ([]models.Market, error) {
+func (m *MockMarketRepository) ListActive(ctx context.Context, limit, offset int32, borrower string) ([]models.Market, error) {
 	result := make([]models.Market, 0)
 	for _, market := range m.markets {
-		if market.IsActive {
-			result = append(result, *market)
+		if !market.IsActive {
+			continue
 		}
+		if borrower != "" && !strings.EqualFold(market.Borrower, borrower) {
+			continue
+		}
+		result = append(result, *market)
 	}
 	return result, nil
 }
@@ -223,7 +228,7 @@ func TestListMarkets(t *testing.T) {
 
 	service := NewMarketService(mockRepo, mockOfferRepo, mockPosRepo)
 
-	markets, err := service.ListMarkets(context.Background(), 10, 0)
+	markets, err := service.ListMarkets(context.Background(), 10, 0, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/Revvfi/revvfi-backend/internal/api/dto/response"
 	"github.com/Revvfi/revvfi-backend/internal/core/offer"
 	"github.com/Revvfi/revvfi-backend/internal/logger"
+	"github.com/Revvfi/revvfi-backend/internal/models"
 )
 
 /*
@@ -142,8 +143,39 @@ func (h *OfferHandler) List(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
-	limit, offset := pagination(req.Page, req.PageSize)
-	offers, err := h.service.GetMarketOffers(c.Request.Context(), req.MarketAddress, limit, offset)
+
+	var offers []models.Offer
+	var err error
+
+	switch {
+	case req.Lender != "":
+		// "My Offers" - every offer (any market, any status) placed by this
+		// lender. Was previously unreachable: this query param didn't exist
+		// on the DTO at all, and List() always called GetMarketOffers()
+		// regardless, so a lender's own offers never showed up anywhere
+		// that queried by lender instead of by market.
+		page := req.Page
+		if page < 1 {
+			page = 1
+		}
+		pageSize := req.PageSize
+		if pageSize < 1 {
+			pageSize = 20
+		}
+		offers, err = h.service.GetLenderOffers(c.Request.Context(), req.Lender, page, pageSize)
+	case req.MarketAddress != "":
+		limit, offset := pagination(req.Page, req.PageSize)
+		offers, err = h.service.GetMarketOffers(c.Request.Context(), req.MarketAddress, limit, offset)
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error": gin.H{
+				"code":    "INVALID_REQUEST",
+				"message": "market_address or lender is required",
+			},
+		})
+		return
+	}
 	if err != nil {
 		writeError(c, err)
 		return

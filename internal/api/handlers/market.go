@@ -147,7 +147,7 @@ func (h *MarketHandler) List(c *gin.Context) {
 	}
 
 	limit, offset := pagination(req.Page, req.PageSize)
-	markets, err := h.service.ListMarkets(c.Request.Context(), limit, offset)
+	markets, err := h.service.ListMarkets(c.Request.Context(), limit, offset, req.Borrower)
 	if err != nil {
 		writeError(c, err)
 		return

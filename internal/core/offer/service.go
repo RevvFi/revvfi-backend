@@ -51,6 +51,7 @@ type OfferRepository interface {
 	CreateOffer(ctx context.Context, offer *models.Offer) error
 	GetByID(ctx context.Context, offerID int64) (*models.Offer, error)
 	GetActiveByMarket(ctx context.Context, marketAddr string, limit, offset int32) ([]models.Offer, error)
+	GetByLender(ctx context.Context, lender string, page, pageSize int32) ([]models.Offer, int64, error)
 	UpdateOffer(ctx context.Context, offer *models.Offer) error
 	CancelOffer(ctx context.Context, offerID int64) error
 }
@@ -185,6 +186,36 @@ limit, offset int32,
 	offers, err := s.offerRepo.GetActiveByMarket(ctx, marketAddr, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch offers: %w", err)
+	}
+
+	return offers, nil
+}
+
+/*
+@function GetLenderOffers
+
+@desc
+Lists every offer (any market, any status) placed by a specific lender -
+the read path behind "My Offers" in the frontend's Portfolio/Lend pages.
+
+@params
+- ctx: request context
+- lender: lender's wallet address
+- page: 1-indexed page number
+- pageSize: results per page
+
+@returns
+- []models.Offer: the lender's offers
+- error: if query fails
+*/
+func (s *OfferService) GetLenderOffers(
+ctx context.Context,
+lender string,
+page, pageSize int32,
+) ([]models.Offer, error) {
+	offers, _, err := s.offerRepo.GetByLender(ctx, lender, page, pageSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch lender offers: %w", err)
 	}
 
 	return offers, nil

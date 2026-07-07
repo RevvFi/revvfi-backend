@@ -68,6 +68,20 @@ func (m *MockOfferRepository) UpdateOffer(ctx context.Context, offer *models.Off
 	return nil
 }
 
+func (m *MockOfferRepository) GetByLender(
+ctx context.Context,
+lender string,
+page, pageSize int32,
+) ([]models.Offer, int64, error) {
+	var result []models.Offer
+	for _, offer := range m.offers {
+		if offer.Lender == lender {
+			result = append(result, *offer)
+		}
+	}
+	return result, int64(len(result)), nil
+}
+
 func (m *MockOfferRepository) CancelOffer(ctx context.Context, offerID int64) error {
 	if offer, exists := m.offers[offerID]; exists {
 		offer.Status = "cancelled"

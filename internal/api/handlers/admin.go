@@ -43,7 +43,7 @@ Interface for market service operations (used for dependency injection and testi
 type MarketServiceInterface interface {
 	CreateMarket(ctx context.Context, marketAddr string, borrower, borrowAsset, collateralAsset, collateralOracle string, minRatio, liquidationThreshold int32) (*models.Market, error)
 	GetMarket(ctx context.Context, address string) (*models.Market, error)
-	ListMarkets(ctx context.Context, limit, offset int32) ([]models.Market, error)
+	ListMarkets(ctx context.Context, limit, offset int32, borrower string) ([]models.Market, error)
 	CalculateMetrics(ctx context.Context, market *models.Market) (map[string]any, error)
 }
 
@@ -546,6 +546,7 @@ func (h *AdminHandler) ListMarkets(c *gin.Context) {
 		ctx,
 		int32(limit),
 		int32(offset),
+		"",
 	)
 	if err != nil {
 		statusCode := appErr.StatusCode(err)
