@@ -68,9 +68,6 @@ func main() {
 	}
 	defer ethClient.Close()
 
-	// Diagnostic: print RPC URL and network ID to ensure we're connected to the expected node
-	cfg.Blockchain.StartBlock = 0 // will remove it just for the testing purpose
-
 	logger.Info("RPC connection established",
 		"rpc_url", cfg.Blockchain.RPCURL,
 		"start_block", cfg.Blockchain.StartBlock,
@@ -100,7 +97,10 @@ func main() {
 	indexerCfg.MarketAddress = cfg.Blockchain.MarketAddress
 	indexerCfg.OfferBookAddress = cfg.Blockchain.OfferBookAddress
 	indexerCfg.CollateralEscrowAddress = cfg.Blockchain.CollateralEscrowAddress
-	indexerCfg.StartBlock = int64(cfg.Blockchain.StartBlock)  
+	indexerCfg.StartBlock = int64(cfg.Blockchain.StartBlock)
+	indexerCfg.BlockConfirmations = cfg.Blockchain.BlockConfirmations
+	indexerCfg.PollInterval = cfg.Blockchain.SyncBlockInterval
+	indexerCfg.BatchSize = cfg.Blockchain.MaxBlockBatchSize
 
 	logger.Info("Creating indexer worker",
 		logger.WithContractAddress(cfg.Blockchain.FactoryAddress),

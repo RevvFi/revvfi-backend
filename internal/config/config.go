@@ -68,6 +68,7 @@ type DatabaseConfig struct {
 	MaxOpenConns    int
 	MaxIdleConns    int
 	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
 }
 
 /*
@@ -142,6 +143,9 @@ type BlockchainConfig struct {
 	OfferBookAddress          string
 	CollateralEscrowAddress   string
 	StartBlock                uint64
+	BlockConfirmations        int
+	SyncBlockInterval         time.Duration
+	MaxBlockBatchSize         int
 	AdminWallets              []string
 }
 
@@ -208,6 +212,7 @@ func Load() (*Config, error) {
 			MaxOpenConns:    getIntEnv("DB_MAX_CONN", 25),
 			MaxIdleConns:    getIntEnv("DB_MIN_CONN", 5),
 			ConnMaxLifetime: getDurationEnv("DB_CONN_MAX_LIFETIME", 30*time.Minute),
+			ConnMaxIdleTime: getDurationEnv("DB_CONN_MAX_IDLE_TIME", 5*time.Minute),
 		},
 		JWT: JWTConfig{
 			Secret: getEnv("JWT_SECRET", "development-jwt-secret-change-me-32-bytes"),
@@ -236,6 +241,10 @@ func Load() (*Config, error) {
 			MarketAddress:             getEnv("MARKET_ADDRESS", ""),
 			OfferBookAddress:          getEnv("OFFERBOOK_ADDRESS", ""),
 			CollateralEscrowAddress:   getEnv("COLLATERAL_ESCROW_ADDRESS", ""),
+			StartBlock:                uint64(getIntEnv("INDEXER_START_BLOCK", 0)),
+			BlockConfirmations:        getIntEnv("BLOCK_CONFIRMATIONS", 0),
+			SyncBlockInterval:         getDurationEnv("SYNC_BLOCK_INTERVAL", 3*time.Second),
+			MaxBlockBatchSize:         getIntEnv("MAX_BLOCK_BATCH_SIZE", 100),
 			AdminWallets:              splitEnv("ADMIN_WALLETS", []string{}),
 		},
 		Auth: AuthConfig{ 

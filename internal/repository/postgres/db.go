@@ -57,6 +57,7 @@ func Open(ctx context.Context, cfg config.DatabaseConfig) (*DB, error) {
 	conn.SetMaxOpenConns(cfg.MaxOpenConns)
 	conn.SetMaxIdleConns(cfg.MaxIdleConns)
 	conn.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+	conn.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
 
 	if err := conn.PingContext(ctx); err != nil {
 		_ = conn.Close()

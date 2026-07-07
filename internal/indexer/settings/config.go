@@ -49,7 +49,7 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		StartBlock:         0,
-		BlockConfirmations: 0, // for development purpoose i was getting lot of errror because of this
+		BlockConfirmations: 0, // safe for a private single-node chain (e.g. Anvil); override via BLOCK_CONFIRMATIONS for public testnets/mainnet
 		PollInterval:       3 * time.Second,
 		BatchSize:          100,
 		MaxRetries:         5,
