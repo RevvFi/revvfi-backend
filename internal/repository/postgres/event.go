@@ -798,6 +798,24 @@ func (r *EventRepository) UpdateBorrowerWhitelistStatus(ctx context.Context, bor
     return mapError(err)
 }
 
+/*
+@method ResolveApprovedBorrowerRequest
+
+@desc
+Auto-resolves any pending off-chain borrower_requests row for a wallet to
+'approved' when the indexer observes an on-chain BorrowerAdded event. A
+no-op if no pending request exists (an admin can register a borrower who
+never went through the request queue at all).
+*/
+func (r *EventRepository) ResolveApprovedBorrowerRequest(ctx context.Context, borrowerAddress string) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        UPDATE borrower_requests
+        SET status = 'approved', decided_at = NOW(), decided_by = 'on-chain'
+        WHERE LOWER(wallet_address) = LOWER($1) AND status = 'pending'
+    `, borrowerAddress)
+    return mapError(err)
+}
+
 // =====================================================
 // CHECKPOINT METHODS
 // =====================================================

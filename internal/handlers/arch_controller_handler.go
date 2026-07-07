@@ -114,10 +114,19 @@ func (h *ArchControllerHandler) handleArchControllerUpdated(ctx context.Context,
  * @param event Decoded ArchBorrowerAdded event
  * @param blockNum Block number where borrower was added
  * @note Creates a borrower record if one does not already exist (reputation score 500 / B).
+ * @note Also auto-resolves any pending off-chain borrower_requests row for this
+ *       wallet to "approved" — best-effort: a failure here must not fail the
+ *       whitelist update itself, since on-chain state is already correct.
  */
 func (h *ArchControllerHandler) handleBorrowerAdded(ctx context.Context, event *types.ArchBorrowerAddedEvent, blockNum uint64) error {
 	log.Printf("BorrowerAdded: Borrower=%s Block=%d", event.Borrower.Hex(), blockNum)
-	return h.eventRepo.UpdateBorrowerWhitelistStatus(ctx, event.Borrower.Hex(), true)
+	if err := h.eventRepo.UpdateBorrowerWhitelistStatus(ctx, event.Borrower.Hex(), true); err != nil {
+		return err
+	}
+	if err := h.eventRepo.ResolveApprovedBorrowerRequest(ctx, event.Borrower.Hex()); err != nil {
+		log.Printf("BorrowerAdded: failed to auto-resolve pending request for %s: %v", event.Borrower.Hex(), err)
+	}
+	return nil
 }
 
 /*@

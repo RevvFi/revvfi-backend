@@ -84,6 +84,12 @@ var (
 	ErrInvalidWithdrawalStatus = stdErrors.New("invalid withdrawal status")
 	ErrInsufficientBalance     = stdErrors.New("insufficient balance")
 	ErrEpochNotFound           = stdErrors.New("epoch not found")
+
+	// Borrower request errors
+	ErrBorrowerRequestNotFound      = stdErrors.New("borrower request not found")
+	ErrBorrowerRequestAlreadyPending = stdErrors.New("a borrower request is already pending for this wallet")
+	ErrBorrowerAlreadyRegistered    = stdErrors.New("wallet is already a registered borrower")
+	ErrBorrowerRequestNotPending    = stdErrors.New("borrower request is no longer pending")
 )
 
 /*
@@ -199,7 +205,7 @@ func StatusCode(err error) int {
 	case ErrUnauthorized, ErrInvalidToken, ErrInvalidNonce:
 		return 401
 	case ErrMarketNotFound, ErrPositionNotFound, ErrOfferNotFound, ErrBorrowerNotFound,
-		ErrAuctionNotFound, ErrWithdrawalNotFound:
+		ErrAuctionNotFound, ErrWithdrawalNotFound, ErrBorrowerRequestNotFound:
 		return 404
 	case ErrInvalidInput, ErrInvalidAddress, ErrInvalidAmount, ErrInvalidAPR,
 		ErrInvalidSignature, ErrInvalidMarketConfig:
@@ -207,6 +213,8 @@ func StatusCode(err error) int {
 	case ErrInsufficientLiquidity, ErrInsufficientCollateral, ErrMarketAlreadyExists,
 		ErrMarketClosed, ErrMarketLiquidating, ErrOfferExpired, ErrOfferNotActive:
 		return 422
+	case ErrBorrowerRequestAlreadyPending, ErrBorrowerAlreadyRegistered, ErrBorrowerRequestNotPending:
+		return 409
 	case ErrInternal, ErrDatabaseError:
 		return 500
 	default:
@@ -270,6 +278,14 @@ func ErrorCode(err error) string {
 		return "AUCTION_ALREADY_SETTLED"
 	case ErrNotLiquidatable:
 		return "NOT_LIQUIDATABLE"
+	case ErrBorrowerRequestNotFound:
+		return "BORROWER_REQUEST_NOT_FOUND"
+	case ErrBorrowerRequestAlreadyPending:
+		return "BORROWER_REQUEST_ALREADY_PENDING"
+	case ErrBorrowerAlreadyRegistered:
+		return "BORROWER_ALREADY_REGISTERED"
+	case ErrBorrowerRequestNotPending:
+		return "BORROWER_REQUEST_NOT_PENDING"
 	default:
 		return "INTERNAL_ERROR"
 	}

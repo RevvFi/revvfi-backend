@@ -37,6 +37,7 @@ type Handlers struct {
 	Offer            *handlers.OfferHandler
 	Position         *handlers.PositionHandler
 	Borrower         *handlers.BorrowerHandler
+	BorrowerRequest  *handlers.BorrowerRequestHandler
 	Liquidation      *handlers.LiquidationHandler
 	Withdrawal       *handlers.WithdrawalHandler
 	Transaction      *handlers.TransactionHandler
@@ -265,6 +266,21 @@ func Register(router *gin.Engine, cfg *config.Config, authService *auth.AuthServ
 				*/
 				admin.GET("/admin/system/config", h.AdminSystem.GetSystemConfig)
 				admin.POST("/admin/system/config/prepare", h.AdminSystem.PrepareUpdateSystemConfig)
+
+				/*
+				@routes AdminBorrowerRequests
+				@desc Admin review queue for off-chain borrower access requests.
+
+				@architecture
+				registerBorrower() is onlyOwner on-chain, so an arbitrary wallet can
+				never self-register. Approval still happens on-chain (admin sends
+				registerBorrower() from their own connected wallet; the indexer
+				auto-resolves the matching request to "approved" when it observes
+				the BorrowerAdded event). Rejection has no on-chain effect, so it is
+				a plain backend endpoint.
+				*/
+				admin.GET("/admin/borrower-requests", h.BorrowerRequest.List)
+				admin.PATCH("/admin/borrower-requests/:id/reject", h.BorrowerRequest.Reject)
 			}
 
 			/*
@@ -284,16 +300,22 @@ func Register(router *gin.Engine, cfg *config.Config, authService *auth.AuthServ
 
 			/*
 			@routes AuthenticatedBorrowers
-			@desc REMOVED - Borrower registration must go through blockchain (admin action)
+			@desc Borrower access request queue (self-registration is still
+			blocked on-chain; see AdminBorrowerRequests below for the actual
+			admin approval flow).
 
 			@architecture
-			Only admins can register borrowers via ArchController.registerBorrower().
-			This happens on-chain, emits BorrowerAdded event, indexer processes it.
+			Only admins can register borrowers via ArchController.registerBorrower()
+			(onlyOwner on-chain). This route lets any signed-in wallet submit a
+			request for the admin to review, instead of a direct (and impossible)
+			self-registration.
 
 			@see internal/handlers/arch_controller_handler.go for event processing
 			@see app/(app)/admin/page.tsx for admin UI implementation
 			*/
 			// protected.POST("/borrowers/register", h.Borrower.Register) // ❌ REMOVED - Admin-only on-chain action
+			protected.POST("/borrower-requests", h.BorrowerRequest.Create)
+			protected.GET("/borrower-requests/me", h.BorrowerRequest.GetMine)
 			protected.GET("/positions", h.Position.ListMine)
 			protected.GET("/positions/portfolio", h.Position.Portfolio)
 			protected.GET("/positions/:tokenID", h.Position.Get)

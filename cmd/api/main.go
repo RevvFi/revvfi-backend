@@ -128,6 +128,13 @@ func main() {
 	borrowerService := borrower.NewBorrowerService(borrowerRepo)
 
 	/*
+	@construction BorrowerRequestService
+	@desc Initialize the off-chain borrower access request queue service.
+	*/
+	borrowerRequestRepo := postgres.NewBorrowerRequestRepository(db)
+	borrowerRequestService := borrower.NewBorrowerRequestService(borrowerRequestRepo, borrowerRepo)
+
+	/*
 	@construction LiquidationService
 	@desc Initialize liquidation service for auction management and Dutch auctions.
 	*/
@@ -274,6 +281,12 @@ func main() {
 		@desc Handles borrower profile lookup, risk assessment, and registration.
 		*/
 		Borrower: apihandlers.NewBorrowerHandler(borrowerService),
+
+		/*
+		@handler BorrowerRequest
+		@desc Handles the off-chain borrower access request queue (submit, check own status, admin list/reject).
+		*/
+		BorrowerRequest: apihandlers.NewBorrowerRequestHandler(borrowerRequestService),
 
 		/*
 		@handler Liquidation
