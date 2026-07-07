@@ -108,6 +108,32 @@ func (r *AuctionRepository) GetLiquidatableCount(ctx context.Context) (int64, er
 }
 
 /*
+@method GetBidsByAuction
+
+@desc
+Lists every bid placed on an auction, most recent first.
+*/
+func (r *AuctionRepository) GetBidsByAuction(ctx context.Context, auctionID int64) ([]models.Bid, error) {
+	rows, err := r.db.conn.QueryContext(ctx, `select id,auction_id,bidder,bid_amount,placed_at,tx_hash,created_at from bids where auction_id=$1 order by placed_at desc`, auctionID)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	defer rows.Close()
+
+	items := make([]models.Bid, 0)
+	for rows.Next() {
+		var b models.Bid
+		var bidAmount string
+		if err := rows.Scan(&b.ID, &b.AuctionID, &b.Bidder, &bidAmount, &b.PlacedAt, &b.TxHash, &b.CreatedAt); err != nil {
+			return nil, mapError(err)
+		}
+		b.BidAmount = parseInt(bidAmount)
+		items = append(items, b)
+	}
+	return items, mapError(rows.Err())
+}
+
+/*
 @function scanAuction
 
 @desc

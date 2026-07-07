@@ -81,6 +81,26 @@ func (m *MockAuctionRepository) GetLiquidatableCount(ctx context.Context) (int64
 	return count, nil
 }
 
+func (m *MockAuctionRepository) GetAllActive(ctx context.Context) ([]models.Auction, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	result := make([]models.Auction, 0)
+	for _, auction := range m.auctions {
+		if auction.Status == "active" {
+			result = append(result, *auction)
+		}
+	}
+	return result, nil
+}
+
+func (m *MockAuctionRepository) GetBidsByAuction(ctx context.Context, auctionID int64) ([]models.Bid, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return []models.Bid{}, nil
+}
+
 /*
 @struct MockMarketRepository
 

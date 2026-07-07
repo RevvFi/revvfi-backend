@@ -117,6 +117,7 @@ func Register(router *gin.Engine, cfg *config.Config, authService *auth.AuthServ
 		api.GET("/liquidations", h.Liquidation.Liquidatable)
 		api.GET("/liquidations/auctions/:auctionID", h.Liquidation.GetAuction)
 		api.GET("/liquidations/auctions/:auctionID/price", h.Liquidation.Price)
+		api.GET("/liquidations/auctions/:auctionID/bids", h.Liquidation.GetBids)
 
 		protected := api.Group("")
 		protected.Use(middleware.Auth(authService))

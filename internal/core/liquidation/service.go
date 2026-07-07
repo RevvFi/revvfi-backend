@@ -54,6 +54,7 @@ type AuctionRepository interface {
 	GetAllActive(ctx context.Context) ([]models.Auction, error)
 	UpdateAuction(ctx context.Context, auction *models.Auction) error
 	GetLiquidatableCount(ctx context.Context) (int64, error)
+	GetBidsByAuction(ctx context.Context, auctionID int64) ([]models.Bid, error)
 }
 
 /*
@@ -212,6 +213,28 @@ auctionID string,
 	auction.CurrentPrice = currentPrice
 
 	return auction, nil
+}
+
+/*
+@function GetAuctionBids
+
+@desc
+Returns the full bid history for an auction, most recent first.
+*/
+func (s *LiquidationService) GetAuctionBids(ctx context.Context, auctionID string) ([]models.Bid, error) {
+	auction, err := s.auctionRepo.GetByID(ctx, auctionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch auction: %w", err)
+	}
+	if auction == nil {
+		return nil, appErr.ErrAuctionNotFound
+	}
+
+	bids, err := s.auctionRepo.GetBidsByAuction(ctx, auction.AuctionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch bids: %w", err)
+	}
+	return bids, nil
 }
 
 /*

@@ -104,6 +104,9 @@ func (h *AuctionHandler) handleAuctionCreated(ctx context.Context, event *types.
  *   - Previous highest bidder is refunded
  */
 func (h *AuctionHandler) handleBidPlaced(ctx context.Context, event *types.BidPlacedEvent) error {
+	if err := h.eventRepo.SaveBid(ctx, event.AuctionID.Int64(), event.Bidder.Hex(), event.BidAmount); err != nil {
+		return err
+	}
 	return h.eventRepo.UpdateAuctionBid(ctx, event.AuctionID.Int64(), event.BidAmount, event.Bidder.Hex())
 }
 

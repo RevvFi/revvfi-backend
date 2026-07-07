@@ -542,6 +542,23 @@ func (r *EventRepository) UpdateAuctionBid(ctx context.Context, auctionID int64,
 }
 
 /*
+@method SaveBid
+@desc Records a single bid in the auction's bid history (the auctions table
+      only tracks the current highest bid/bidder, not every bid placed).
+@param auctionID Auction ID
+@param bidder Address that placed the bid
+@param bidAmount Bid amount in wei
+*/
+func (r *EventRepository) SaveBid(ctx context.Context, auctionID int64, bidder string, bidAmount *big.Int) error {
+    _, err := r.db.conn.ExecContext(ctx, `
+        INSERT INTO bids(auction_id, bidder, bid_amount, placed_at)
+        VALUES ($1, $2, $3, $4)
+    `, auctionID, bidder, bidAmount.String(), time.Now().Unix())
+
+    return mapError(err)
+}
+
+/*
 @method SettleAuction
 @desc Marks auction as settled with winner info
 @param auctionID Auction ID

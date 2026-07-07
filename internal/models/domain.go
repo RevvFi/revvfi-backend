@@ -197,6 +197,24 @@ type Auction struct {
 }
 
 /*
+@struct Bid
+
+@desc
+A single bid placed on a liquidation auction. One auction accumulates many
+bids over time; the auction's own highest_bid/highest_bidder columns only
+track the current leader, not history.
+*/
+type Bid struct {
+	ID        int64
+	AuctionID int64
+	Bidder    string
+	BidAmount *big.Int
+	PlacedAt  int64
+	TxHash    sql.NullString
+	CreatedAt time.Time
+}
+
+/*
 @struct Borrower
 
 @desc

@@ -134,3 +134,42 @@ func (h *LiquidationHandler) Price(c *gin.Context) {
 	}
 	ok(c, http.StatusOK, gin.H{"auction_id": c.Param("auctionID"), "current_price": price.String()})
 }
+
+/*
+@method GetBids
+
+@desc
+Handles auction bid history requests - every bid placed on the auction,
+not just the current highest one.
+
+@params
+- c: Gin context
+*/
+func (h *LiquidationHandler) GetBids(c *gin.Context) {
+	bids, err := h.service.GetAuctionBids(c.Request.Context(), c.Param("auctionID"))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	items := make([]gin.H, 0, len(bids))
+	for _, b := range bids {
+		txHash := ""
+		if b.TxHash.Valid {
+			txHash = b.TxHash.String
+		}
+		items = append(items, gin.H{
+			"bid_id":     b.ID,
+			"auction_id": b.AuctionID,
+			"bidder":     b.Bidder,
+			"amount":     b.BidAmount.String(),
+			"timestamp":  b.PlacedAt,
+			"tx_hash":    txHash,
+		})
+	}
+
+	ok(c, http.StatusOK, gin.H{
+		"count": len(items),
+		"bids":  items,
+	})
+}
