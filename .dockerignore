@@ -1,0 +1,28 @@
+# Never send these into the Docker build context — keeps the context small
+# (faster builds/uploads to the daemon) and prevents secrets or host-specific
+# junk from ever being COPY-able into an image layer, even by accident.
+
+.git
+.github
+
+# Real secrets — only .env.example should ever be readable by a Dockerfile.
+.env
+.env.local
+.env.*.local
+
+# Host-built artifacts — the image builds its own binaries from source;
+# shipping host binaries would defeat reproducibility and could leak an
+# incompatible (or wrong-arch) binary into the image.
+bin/
+.bin/
+
+# Docs and local-only tooling, irrelevant to the build.
+*.md
+docker/
+scripts/
+
+# Editor/OS noise.
+.vscode/
+.idea/
+*.swp
+.DS_Store

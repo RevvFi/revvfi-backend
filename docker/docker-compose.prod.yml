@@ -1,0 +1,77 @@
+# Production deployment on EC2 — pulls pre-built images from GitHub
+# Container Registry (GHCR) instead of building on the box. The CI workflow
+# (.github/workflows/ci-cd.yml) is what actually builds and pushes these
+# images on every push to main; this file only ever *runs* them.
+#
+# This replaces the systemd (revvfi-api.service / revvfi-indexer.service)
+# bare-binary deployment — do not run both at once, they'd fight over the
+# same port 8080. See the note at the bottom of this file for the commands
+# to retire the systemd units when you switch to this.
+#
+# Usage on the EC2 host:
+#   docker compose -f docker/docker-compose.prod.yml pull
+#   docker compose -f docker/docker-compose.prod.yml up -d
+#
+# This file does NOT define a postgres service — the database is Supabase
+# (see DATABASE_URL in .env), there is nothing local to run for it.
+
+services:
+  api:
+    image: ghcr.io/revvfi/revvfi-backend-api:latest
+    container_name: revvfi-api
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    ports:
+      # Host port 8080 must stay fixed here — nginx's reverse proxy config
+      # (proxy_pass http://127.0.0.1:8080) points at this exact port and
+      # was set up assuming the API always answers on 8080, container or not.
+      - "127.0.0.1:8080:8080"
+    # No HEALTHCHECK directive: the api image is distroless/static — no
+    # shell, no curl, no wget — so there's no binary available inside the
+    # container for Docker to exec a check with. `restart: unless-stopped`
+    # still restarts it if the process itself exits/crashes; for an actual
+    # HTTP-level health signal, keep using the external
+    # `curl https://api.revvfi.xyz/api/v1/health` check you already have,
+    # or point an uptime monitor at that route instead. If you want a real
+    # container-level HEALTHCHECK, the tradeoff is switching the final
+    # stage's base image to alpine (has wget) instead of distroless — ask
+    # if you want that swapped.
+    logging:
+      driver: json-file
+      options:
+        # Without a cap, Docker's default json-file driver keeps an
+        # unbounded log file per container — on a long-running indexer/api
+        # this quietly fills the EC2 disk over weeks. 10m x 3 files is a
+        # reasonable retention window for debugging without unbounded growth.
+        max-size: "10m"
+        max-file: "3"
+
+  indexer:
+    image: ghcr.io/revvfi/revvfi-backend-indexer:latest
+    container_name: revvfi-indexer
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    # No ports: — the indexer is a background worker, nothing (nginx
+    # included) ever needs to reach it over HTTP.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ---------------------------------------------------------------------------
+# One-time migration off the systemd bare-binary setup, when you're ready to
+# switch to this docker-compose deployment instead:
+#
+#   sudo systemctl disable --now revvfi-api
+#   sudo systemctl disable --now revvfi-indexer
+#   sudo rm /etc/systemd/system/revvfi-api.service
+#   sudo rm /etc/systemd/system/revvfi-indexer.service
+#   sudo systemctl daemon-reload
+#
+# nginx itself is untouched — it keeps proxying to 127.0.0.1:8080 exactly as
+# before, it has no idea whether whatever answers on that port is a bare
+# systemd process or a Docker container.
+# ---------------------------------------------------------------------------

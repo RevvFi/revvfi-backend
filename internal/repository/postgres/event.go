@@ -1275,19 +1275,21 @@ func (r *EventRepository) ClearClaimable(ctx context.Context, tokenID int64) err
  * @note Uses the Total field as the authoritative balance; Amount is accumulated
  * @sql INSERT ... ON CONFLICT (borrower) DO UPDATE SET balance=$newTotal, total_deposited+=amount
  */
-func (r *EventRepository) RecordCollateralDeposit(ctx context.Context, borrower string, amount, _ *big.Int) error {
-    // CollateralDeposited event only emits amount, not the new total.
-    // Accumulate balance and total_deposited from the amount field.
+func (r *EventRepository) RecordCollateralDeposit(ctx context.Context, borrower string, amount, newTotal *big.Int) error {
+    // newTotal (event.Total) is the authoritative current balance from the
+    // chain — set balance directly from it rather than accumulating, so a
+    // reprocessed/replayed event self-corrects instead of double-counting.
+    // amount is still accumulated into total_deposited for historical totals.
     _, err := r.db.conn.ExecContext(ctx, `
         INSERT INTO collateral_balances (
             borrower, balance, total_deposited, last_deposit_at, updated_at
-        ) VALUES ($1, $2, $2, NOW(), NOW())
+        ) VALUES ($1, $2, $3, NOW(), NOW())
         ON CONFLICT (borrower) DO UPDATE SET
-            balance         = (collateral_balances.balance::numeric         + $2::numeric)::text,
-            total_deposited = (collateral_balances.total_deposited::numeric + $2::numeric)::text,
+            balance         = $2,
+            total_deposited = (collateral_balances.total_deposited::numeric + $3::numeric)::text,
             last_deposit_at = NOW(),
             updated_at      = NOW()
-    `, borrower, amount.String())
+    `, borrower, newTotal.String(), amount.String())
     return mapError(err)
 }
 
@@ -1300,19 +1302,24 @@ func (r *EventRepository) RecordCollateralDeposit(ctx context.Context, borrower 
  * @note Uses the Total field as the authoritative balance; Amount is accumulated
  * @sql INSERT ... ON CONFLICT (borrower) DO UPDATE SET balance=$newTotal, total_withdrawn+=amount
  */
-func (r *EventRepository) RecordCollateralWithdrawal(ctx context.Context, borrower string, amount, _ *big.Int) error {
-    // CollateralWithdrawn event only emits amount, not the new total.
-    // Subtract from accumulated balance; clamp at zero to avoid negative values.
+func (r *EventRepository) RecordCollateralWithdrawal(ctx context.Context, borrower string, amount, newTotal *big.Int) error {
+    // newTotal (event.Total) is the authoritative current balance from the
+    // chain — set balance directly from it rather than subtracting, so a
+    // reprocessed/replayed event self-corrects instead of double-subtracting.
+    // This is also what makes handleCollateralLiquidated's
+    // RecordCollateralWithdrawal(..., amount, big.NewInt(0)) call actually
+    // zero the balance out, per its own doc comment.
+    // amount is still accumulated into total_withdrawn for historical totals.
     _, err := r.db.conn.ExecContext(ctx, `
         INSERT INTO collateral_balances (
             borrower, balance, total_withdrawn, last_withdrawal_at, updated_at
-        ) VALUES ($1, '0', $2, NOW(), NOW())
+        ) VALUES ($1, $2, $3, NOW(), NOW())
         ON CONFLICT (borrower) DO UPDATE SET
-            balance         = GREATEST('0', (collateral_balances.balance::numeric - $2::numeric))::text,
-            total_withdrawn = (collateral_balances.total_withdrawn::numeric + $2::numeric)::text,
+            balance            = $2,
+            total_withdrawn    = (collateral_balances.total_withdrawn::numeric + $3::numeric)::text,
             last_withdrawal_at = NOW(),
             updated_at         = NOW()
-    `, borrower, amount.String())
+    `, borrower, newTotal.String(), amount.String())
     return mapError(err)
 }
 

@@ -30,10 +30,10 @@ CREATE TABLE IF NOT EXISTS processed_events (
     CONSTRAINT unique_processed_event UNIQUE(tx_hash, log_index)
 );
 
-CREATE INDEX idx_processed_events_tx ON processed_events(tx_hash);
-CREATE INDEX idx_processed_events_block ON processed_events(block_number);
-CREATE INDEX idx_processed_events_name ON processed_events(event_name);
-CREATE INDEX idx_processed_events_processed_at ON processed_events(processed_at);
+CREATE INDEX IF NOT EXISTS idx_processed_events_tx ON processed_events(tx_hash);
+CREATE INDEX IF NOT EXISTS idx_processed_events_block ON processed_events(block_number);
+CREATE INDEX IF NOT EXISTS idx_processed_events_name ON processed_events(event_name);
+CREATE INDEX IF NOT EXISTS idx_processed_events_processed_at ON processed_events(processed_at);
 
 COMMENT ON TABLE processed_events IS 'Tracks processed blockchain events for idempotency protection';
 
@@ -51,9 +51,9 @@ CREATE TABLE IF NOT EXISTS chain_checkpoints (
     processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_chain_checkpoints_block ON chain_checkpoints(block_number DESC);
-CREATE INDEX idx_chain_checkpoints_finalized ON chain_checkpoints(is_finalized);
-CREATE INDEX idx_chain_checkpoints_processed ON chain_checkpoints(processed_at);
+CREATE INDEX IF NOT EXISTS idx_chain_checkpoints_block ON chain_checkpoints(block_number DESC);
+CREATE INDEX IF NOT EXISTS idx_chain_checkpoints_finalized ON chain_checkpoints(is_finalized);
+CREATE INDEX IF NOT EXISTS idx_chain_checkpoints_processed ON chain_checkpoints(processed_at);
 
 COMMENT ON TABLE chain_checkpoints IS 'Tracks blockchain checkpoints for reorg protection';
 
@@ -61,6 +61,11 @@ COMMENT ON TABLE chain_checkpoints IS 'Tracks blockchain checkpoints for reorg p
 section: 3. FAILED EVENTS (Dead Letter Queue)
 */
 
+-- NOTE: 001_initial_setup.sql already creates failed_events with a minimal
+-- schema (id, payload, reason, created_at), so this CREATE TABLE is a no-op
+-- on any database that ran 001 first. The columns this migration actually
+-- needs are added via ALTER TABLE ... ADD COLUMN IF NOT EXISTS below so they
+-- land regardless of whether the table pre-existed.
 CREATE TABLE IF NOT EXISTS failed_events (
     id BIGSERIAL PRIMARY KEY,
     event_name TEXT NOT NULL,
@@ -75,9 +80,19 @@ CREATE TABLE IF NOT EXISTS failed_events (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_failed_events_retry ON failed_events(next_retry_at) WHERE processed = FALSE;
-CREATE INDEX idx_failed_events_created ON failed_events(created_at);
-CREATE INDEX idx_failed_events_name ON failed_events(event_name);
+ALTER TABLE failed_events ADD COLUMN IF NOT EXISTS event_name TEXT;
+ALTER TABLE failed_events ADD COLUMN IF NOT EXISTS event_data JSONB;
+ALTER TABLE failed_events ADD COLUMN IF NOT EXISTS raw_log JSONB;
+ALTER TABLE failed_events ADD COLUMN IF NOT EXISTS failure_reason TEXT;
+ALTER TABLE failed_events ADD COLUMN IF NOT EXISTS retry_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE failed_events ADD COLUMN IF NOT EXISTS max_retries INTEGER NOT NULL DEFAULT 5;
+ALTER TABLE failed_events ADD COLUMN IF NOT EXISTS next_retry_at TIMESTAMPTZ;
+ALTER TABLE failed_events ADD COLUMN IF NOT EXISTS processed BOOLEAN DEFAULT FALSE;
+ALTER TABLE failed_events ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_failed_events_retry ON failed_events(next_retry_at) WHERE processed = FALSE;
+CREATE INDEX IF NOT EXISTS idx_failed_events_created ON failed_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_failed_events_name ON failed_events(event_name);
 
 COMMENT ON TABLE failed_events IS 'Dead letter queue for failed blockchain event processing';
 
@@ -96,8 +111,8 @@ CREATE TABLE IF NOT EXISTS indexer_sync_state (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_indexer_sync_service ON indexer_sync_state(service_name);
-CREATE INDEX idx_indexer_sync_status ON indexer_sync_state(sync_status);
+CREATE INDEX IF NOT EXISTS idx_indexer_sync_service ON indexer_sync_state(service_name);
+CREATE INDEX IF NOT EXISTS idx_indexer_sync_status ON indexer_sync_state(sync_status);
 
 COMMENT ON TABLE indexer_sync_state IS 'Tracks indexer synchronization progress';
 
@@ -115,8 +130,8 @@ CREATE TABLE IF NOT EXISTS reorg_events (
     detected_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_reorg_events_block ON reorg_events(old_block_number);
-CREATE INDEX idx_reorg_events_detected_at ON reorg_events(detected_at);
+CREATE INDEX IF NOT EXISTS idx_reorg_events_block ON reorg_events(old_block_number);
+CREATE INDEX IF NOT EXISTS idx_reorg_events_detected_at ON reorg_events(detected_at);
 
 COMMENT ON TABLE reorg_events IS 'Audit log of detected blockchain reorganizations';
 

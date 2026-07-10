@@ -1,0 +1,121 @@
+# CI/CD: test -> build Docker images -> push to GHCR -> SSH into EC2 and
+# deploy immediately (push-based: this workflow triggers the deploy, EC2
+# doesn't poll for it on its own).
+#
+#   git push -> GitHub Actions -> [test, build image] -> GHCR -> SSH deploy -> EC2
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}   # lets you manually trigger a rebuild/push from the Actions tab
+
+# GITHUB_TOKEN needs explicit `packages: write` to push to GHCR — it's
+# read-only by default. `contents: read` is all the checkout step needs.
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"   # matches go.mod's `go 1.25.0`
+          cache: true          # caches the module download cache between runs, keyed on go.sum
+
+      # All repository tests use go-sqlmock (see internal/repository/postgres/*_test.go)
+      # rather than a live database, and the one test needing real contract
+      # ABI files (decoder_test.go's TestEventDecoder_Decode) skips itself
+      # via t.Skipf when the hardcoded local artifact path isn't present —
+      # so this runs clean in CI with no Postgres service container and no
+      # secrets needed.
+      - name: Run tests
+        run: go test ./...
+
+      - name: Vet
+        run: go vet ./...
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # GHCR requires lowercase image names/paths; the GitHub org here is
+      # "RevvFi" (mixed case), so `github.repository` can't be used directly
+      # in the image tag below — lowercase it once and reuse via env.
+      - name: Compute lowercase image name
+        run: echo "IMAGE_BASE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}   # built-in token, no extra secret needed for same-repo GHCR
+
+      # Two images from the one Dockerfile via --target, tagged both
+      # :latest (what docker-compose.prod.yml on EC2 pulls) and :<git-sha>
+      # (an immutable, reproducible reference for rolling back to a known
+      # build if :latest ever turns out bad).
+      - name: Build and push api image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: api
+          push: true
+          tags: |
+            ${{ env.IMAGE_BASE }}-api:latest
+            ${{ env.IMAGE_BASE }}-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push indexer image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: indexer
+          push: true
+          tags: |
+            ${{ env.IMAGE_BASE }}-indexer:latest
+            ${{ env.IMAGE_BASE }}-indexer:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    # Guards against a workflow_dispatch run from a non-main branch
+    # accidentally deploying untested code — `on.push.branches` already
+    # restricts normal pushes, but the manual trigger lets you pick any
+    # branch in the Actions UI.
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: SSH into EC2 and redeploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          # Inlined rather than calling a script file on the EC2 box: the
+          # workflow never pushes repo file changes to EC2, only Docker
+          # images, so a separate script there could silently go stale.
+          # Running the commands here means the exact steps executed are
+          # always whatever's committed in this workflow file.
+          #
+          # `docker compose up -d` only recreates a container if its image
+          # or config actually changed, so this is a safe no-op when
+          # nothing new was pushed. GHCR auth is a one-time
+          # `docker login ghcr.io` already done on this box (see README/
+          # deploy notes) — cached in ~/.docker/config.json, not repeated
+          # here.
+          script: |
+            cd /home/ubuntu/revvfi-backend/docker
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d
+            docker image prune -f

@@ -132,10 +132,6 @@ CREATE INDEX IF NOT EXISTS idx_event_topics_hash ON event_topics(topic_hash);
 
 COMMENT ON TABLE event_topics IS 'Reference table for event signature topics';
 
-ON CONFLICT (event_name) DO UPDATE SET 
-    topic_hash = EXCLUDED.topic_hash,
-    contract_name = EXCLUDED.contract_name;
-
 /*@
 section: 7. CREATE VIEW FOR ACTIVE MARKETS WITH METRICS
 */
