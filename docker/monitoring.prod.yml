@@ -1,4 +1,4 @@
-# Log aggregation stack (Grafana + Loki + Promtail) for the EC2 host.
+# Log aggregation stack (Grafana + Loki + Alloy) for the EC2 host.
 #
 # Completely independent from docker/docker-compose.prod.yml (API + Indexer):
 # separate compose project, separate Docker network, separate volumes.
@@ -22,8 +22,8 @@ volumes:
     name: revvfi_loki_data
   grafana_data:
     name: revvfi_grafana_data
-  promtail_positions:
-    name: revvfi_promtail_positions
+  alloy_data:
+    name: revvfi_alloy_data
 
 services:
   loki:
@@ -42,19 +42,29 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  promtail:
-    image: grafana/promtail:2.9.8
-    container_name: revvfi-promtail
+  alloy:
+    image: grafana/alloy:1.5.1
+    container_name: revvfi-alloy
     restart: unless-stopped
-    command: -config.file=/etc/promtail/config.yml
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
     volumes:
-      - ../monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
-      - promtail_positions:/var/lib/promtail
-      # Read-only access to the host's container logs + Docker socket —
-      # this is how Promtail discovers and tails revvfi-api/revvfi-indexer
-      # without any code changes on their side.
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ../monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy/data
+      # Docker socket: required — loki.source.docker streams container logs
+      # via the Docker API (like `docker logs -f`), and discovery.docker
+      # needs it to list containers.
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Not read by Alloy's docker log source (which goes through the API
+      # above, not the files), kept mounted only for parity/future use.
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    ports:
+      # Alloy's UI (component graph, discovered targets, debug data) —
+      # localhost-only, same as Grafana's binding below.
+      - "127.0.0.1:12345:12345"
     networks:
       - monitoring
     depends_on:

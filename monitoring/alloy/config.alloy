@@ -1,0 +1,95 @@
+// Grafana Alloy replaces Promtail here. Promtail 2.9.8 hardcodes Docker
+// API version 1.42 in its client; Docker Engine 29 requires 1.44+, which is
+// the "client version 1.42 is too old" error. Alloy's Docker client
+// negotiates the API version with the daemon instead of pinning one, so it
+// works against current Docker Engine releases without any Docker downgrade.
+//
+// Pipeline: discovery.docker -> discovery.relabel -> loki.source.docker
+//           -> loki.process -> loki.write -> Loki
+
+// 1. Find every container the local Docker daemon knows about. This only
+// talks to the Docker socket to list containers/metadata — it does not
+// read any log content by itself.
+discovery.docker "revvfi" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "5s"
+}
+
+// 2. Keep only revvfi-api and revvfi-indexer, and attach the labels we want
+// on every log line from these containers. Loki/Grafana/Alloy's own
+// containers are dropped here so we never ingest our own stack's logs.
+//
+// Note: Go's RE2 regex engine (used here, same as Prometheus relabeling)
+// has no negative-lookahead support, so this uses an explicit allow-list
+// rather than "match revvfi-* but not loki/grafana/alloy".
+discovery.relabel "revvfi" {
+  targets = discovery.docker.revvfi.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "^/(revvfi-api|revvfi-indexer)$"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "^/(.*)$"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_id"]
+    regex         = "(.{12}).*"
+    target_label  = "container_id"
+    replacement   = "$1"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_log_stream"]
+    target_label  = "stream"
+  }
+}
+
+// 3. Tail the filtered containers via the Docker API (equivalent to
+// `docker logs -f <container>`) and hand raw log lines + the labels from
+// step 2 to the next stage. Still reads Docker's own json-file log driver
+// output under the hood — no logging driver change needed.
+loki.source.docker "revvfi" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.revvfi.output
+  forward_to = [loki.process.revvfi.receiver]
+}
+
+// 4. Parse each line as the slog JSON our Go services emit
+// (internal/logger), pull level/service out as Loki labels, and use the
+// log's own timestamp field instead of Alloy's read time.
+loki.process "revvfi" {
+  forward_to = [loki.write.default.receiver]
+
+  stage.json {
+    expressions = {
+      level     = "level",
+      service   = "service",
+      timestamp = "timestamp",
+    }
+  }
+
+  stage.labels {
+    values = {
+      level   = "level",
+      service = "service",
+    }
+  }
+
+  stage.timestamp {
+    source = "timestamp"
+    format = "RFC3339Nano"
+  }
+}
+
+// 5. Ship the processed entries to Loki over the shared monitoring network.
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
